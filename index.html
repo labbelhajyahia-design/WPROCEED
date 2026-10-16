@@ -585,7 +585,8 @@ function markSpeaking(scroll){
 
 /* ---------- Dictée ---------- */
 let REC=null;
-function stopRec(){ if(REC){ try{ REC.onend=null; REC.stop(); }catch(e){} REC=null; } }
+let REC_WANT=false;
+function stopRec(){ REC_WANT=false; if(REC){ const r=REC; REC=null; try{ r.stop(); }catch(e){} } }
 function startRec(tid="answer"){
   const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
   const ta = $("#"+tid);
@@ -593,19 +594,32 @@ function startRec(tid="answer"){
   if(REC){ stopRec(); render(); return; }
   TTS.stop();
   const put = v => { if(tid==="answer") setText(v); else S.imp.texte=v; };
-  const rec = new SR(); rec.lang="fr-FR"; rec.continuous=true; rec.interimResults=true;
-  const base = ta.value.trim() ? ta.value.trim()+(tid==="imptext"?"\n":" ") : ""; let fin="";
-  rec.onresult = e=>{
-    let interim="";
-    for(let i=e.resultIndex;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal) fin+=r[0].transcript.trim()+" "; else interim+=r[0].transcript; }
-    const box=$("#"+tid); if(!box) return;
-    if(tid==="answer" && /question suivante\s*$/i.test(fin.trim())){ fin=fin.trim().replace(/[,.]?\s*question suivante\s*$/i,""); box.value=(base+fin).trim(); put(box.value); stopRec(); nextQ(true); return; }
-    box.value = base+fin+interim; put(box.value);
-    if(tid==="answer"){ const pv=$("#preview"); if(pv) pv.innerHTML=previewHTML(curRep()); }
+  const android = /Android/i.test(navigator.userAgent);
+  let acc = ta.value.trim() ? ta.value.trim()+(tid==="imptext"?"\n":" ") : "";
+  REC_WANT = true;
+  const launch = () => {
+    const rec = new SR(); rec.lang="fr-FR"; rec.continuous=!android; rec.interimResults=true; rec.maxAlternatives=1;
+    let fin="";
+    rec.onresult = e=>{
+      let f="", interim="";
+      for(let i=0;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal) f+=r[0].transcript.trim()+" "; else interim=r[0].transcript; }
+      fin=f;
+      const box=$("#"+tid); if(!box) return;
+      const all=(acc+fin).replace(/\s+/g," ");
+      if(tid==="answer" && /question suivante\s*$/i.test(all.trim())){ box.value=all.trim().replace(/[,.]?\s*question suivante\s*$/i,"").trim(); put(box.value); stopRec(); nextQ(true); return; }
+      box.value = all+interim; put(box.value);
+      if(tid==="answer"){ const pv=$("#preview"); if(pv) pv.innerHTML=previewHTML(curRep()); }
+    };
+    rec.onerror = e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed"){ REC_WANT=false; toast("Micro non autorisé ici : touchez la zone de texte puis le micro du clavier."); } else if(e.error==="network"){ REC_WANT=false; toast("La dictée a besoin d'Internet."); } };
+    rec.onend = ()=>{
+      acc=(acc+fin).replace(/\s+/g," ");
+      if(REC!==rec) return;
+      if(REC_WANT){ try{ launch(); return; }catch(err){} }
+      REC=null; render();
+    };
+    REC=rec; rec.start();
   };
-  rec.onerror = e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed") toast("Micro non autorisé ici : touchez la zone de texte puis le micro du clavier."); else if(e.error!=="no-speech"&&e.error!=="aborted") toast("Dictée interrompue ("+e.error+")."); };
-  rec.onend = ()=>{ REC=null; render(); };
-  try{ rec.start(); REC=rec; render(); }catch(err){ REC=null; toast("Impossible de démarrer la dictée : utilisez le micro du clavier."); }
+  try{ launch(); render(); }catch(err){ REC=null; REC_WANT=false; toast("Impossible de démarrer la dictée : utilisez le micro du clavier."); }
 }
 function voiceSearch(tid){
   const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -831,15 +845,106 @@ function extraireBouton(s){
   return v ? v[1].trim() : "";
 }
 
+/* ---------- Découpage d'un texte libre ou dicté (sans Claude) ---------- */
+const VERBES_IRR = {
+  "allez":"aller","vas":"aller","va":"aller","vais":"aller","rendez-vous":"aller","rends-toi":"aller",
+  "mettez":"mettre","mets":"mettre","met":"mettre","attendez":"attendre","attends":"attendre","attend":"attendre",
+  "choisissez":"choisir","choisis":"choisir","choisit":"choisir","remplissez":"remplir","remplis":"remplir","remplit":"remplir",
+  "saisissez":"saisir","saisis":"saisir","saisit":"saisir","ouvrez":"ouvrir","ouvres":"ouvrir","ouvre":"ouvrir",
+  "éteignez":"éteindre","éteins":"éteindre","éteint":"éteindre","lisez":"lire","lis":"lire","lit":"lire",
+  "faites":"faire","fais":"faire","fait":"faire","prenez":"prendre","prends":"prendre","prend":"prendre",
+  "sortez":"sortir","sors":"sortir","sort":"sortir","mettre":"mettre","remettez":"remettre","remets":"remettre",
+  "attendre":"attendre","vérifies":"vérifier","retournez":"retourner","reviens":"revenir","revenez":"revenir","revient":"revenir",
+  "maintenez":"maintenir","maintiens":"maintenir","tenez":"tenir","tiens":"tenir","introduisez":"introduire","introduis":"introduire",
+  "relisez":"relire","relis":"relire","appuies":"appuyer","appuie":"appuyer","appuyez":"appuyer"
+};
+const VERBES_ER = ["cliquer","appuyer","aller","sélectionner","vérifier","placer","scanner","lancer","retirer","fermer","entrer","valider","confirmer","allumer","quitter","charger","retourner","passer","enregistrer","verser","mélanger","diluer","régler","insérer","nettoyer","toucher","démarrer","arrêter","contrôler","noter","imprimer","changer","remplacer","déposer","poser","jeter","vider","rincer","essuyer","activer","désactiver","initialiser","calibrer","programmer","demander","rechercher","chercher","cocher","décocher","taper","ajouter","supprimer","copier","coller","positionner","identifier","étiqueter","agiter","centrifuger","décongeler","homogénéiser","pipeter","reconstituer","patienter","observer","regarder","surveiller","utiliser","accéder","afficher","glisser","tourner","pousser","tirer","refermer","rouvrir","exécuter","relancer","mesurer","comparer","consulter","transférer","décharger","recharger","brancher","débrancher","laver","sécher","stocker","conserver","éliminer","porter","appeler","prévenir","signaler","remplacer","mettre","attendre","choisir","remplir","saisir","ouvrir","éteindre","lire","faire","prendre","sortir"];
+const VSET = new Set(VERBES_ER);
+function versInfinitif(w){
+  const m = w.toLowerCase();
+  if (VERBES_IRR[m]) return VERBES_IRR[m];
+  if (VSET.has(m)) return m;
+  for (const suf of ["ez","es","e"]) if (m.endsWith(suf)){ const inf=m.slice(0,-suf.length)+"er"; if (VSET.has(inf)) return inf; }
+  if (m.endsWith("ons")){ const inf=m.slice(0,-3)+"er"; if (VSET.has(inf)) return inf; }
+  return null;
+}
+const CONNECTEURS = String.raw`(?:et\s+)?(?:ensuite|puis|après\s+(?:ça|cela|ceci)|après|alors|maintenant|enfin|d'abord|tout d'abord|premièrement|deuxièmement|troisièmement|une\s+fois\s+(?:que|terminé|fini|cela fait|c'est fait)|à\s+la\s+fin|dès\s+que|étape\s+suivante|et\s+là)`;
+const SUJETS = String.raw`(?:et\s+)?(?:tu|vous|on|il\s+faut|il\s+faudra|il\s+faut\s+bien|nous)`;
+function premierVerbe(cl){
+  /* retourne [infinitif, reste] si la proposition commence par un verbe d'action */
+  let s = cl.replace(/^(?:et|alors|donc|bon|bien|ensuite|puis|après|maintenant|enfin)\s+/i,"");
+  s = s.replace(/^(?:tu|vous|on|nous|il\s+faut(?:\s+bien)?|il\s+faudra|faut)\s+/i,"");
+  s = s.replace(/^(?:vas|allez|va)\s+(?=\S+er\b|\S+ir\b|\S+re\b)/i,"");         /* « tu vas cliquer » → « cliquer » */
+  s = s.replace(/^(?:dois|devez|doit|devrez)\s+/i,"");
+  const m = s.match(/^([a-zàâçéèêëîïôûùüÿœ'-]+)\b(.*)$/i);
+  if (!m) return null;
+  const inf = versInfinitif(m[1]);
+  return inf ? [inf, m[2].trim()] : null;
+}
+const STOP_BOUTON = /\s+(?:et|puis|pour|ensuite|jusqu|avec|afin|qui|quand|lorsque|si|en\s+bas|en\s+haut|à\s+gauche|à\s+droite|de\s+l'écran|sur\s+l'écran|après|alors|par)\b.*$/i;
+function boutonParle(inf, reste){
+  let m;
+  if (/^(cliquer|appuyer|toucher)$/.test(inf) && (m=reste.match(/^sur\s+(?:le\s+|la\s+|l'|les\s+)?(?:bouton\s+|menu\s+|onglet\s+|icône\s+)?(.+)$/i))) return m[1];
+  if (/^(aller|accéder|retourner|revenir|passer)$/.test(inf) && (m=reste.match(/^(?:dans|sur|à|au)\s+(?:le\s+|la\s+|l'|les\s+)?(?:menu\s+|onglet\s+|écran\s+|section\s+|rubrique\s+|page\s+)?(.+)$/i))) return m[1];
+  if (/^(sélectionner|choisir|ouvrir|lancer|activer|cocher|valider)$/.test(inf) && (m=reste.match(/^(?:le\s+|la\s+|l'|les\s+)?(?:menu|onglet|bouton|écran|option|section)\s+(.+)$/i))) return m[1];
+  if (/^(sélectionner|cocher)$/.test(inf)) return reste.replace(/^(?:le\s+|la\s+|l'|les\s+)/i,"");
+  return "";
+}
+function nettoyerBouton(b){
+  b = String(b||"").replace(/[«»"“”]/g,"").replace(STOP_BOUTON,"").replace(/[.,;:!?]+$/,"").trim();
+  if (!b || b.split(/\s+/).length>6) return "";
+  return cap(b);
+}
 function decouperLocal(t){
-  const parts = t.split(/\s*(?:\n+|[,.]?\s*étape suivante\s*[.,]?|(?<=[.;!?])\s+|,?\s+(?:ensuite|puis|après ça)\s*,?\s+)/i)
-    .map(s=>s.trim().replace(/^[-•\d.)\s]+/,"").replace(/\s*[.;]$/,"")).filter(s=>s.length>2);
-  const out=[];
-  for(const s of parts){
-    const a=s.match(/^(attention|vérification|important|remarque|note|nb)\s*:\s*(.+)$/i);
-    if(a && out.length){ const prev=out[out.length-1]; prev.alerte=(prev.alerte?prev.alerte+" ":"")+cap(a[2])+"."; if(!/^(remarque|note|nb)$/i.test(a[1]) && prev.niveau!=="absolu") prev.niveau="attention"; continue; }
-    const abs=/\b(jamais|interdit|ne pas|surtout pas)\b/i.test(s), att=/\b(attention|vérifier que|bien vérifier)\b/i.test(s);
-    out.push({id:uid(), action:cap(s)+".", bouton:extraireBouton(s), alerte:"", niveau:abs?"absolu":att?"attention":"", photo:"", box:null});
+  let txt = String(t||"")
+    .replace(/\s*(?:point\s+)?à\s+la\s+ligne\s*/gi, ". ")
+    .replace(/\s+virgule\b/gi, ",")
+    .replace(/\s+/g," ").trim();
+  /* découpe : ponctuation forte, connecteurs, « tu / vous / on / il faut » + verbe, « attention » */
+  const parts = txt.split(new RegExp(String.raw`\s*(?:[.;!?]+\s+|[.;!?]+$|,?\s+(?=${CONNECTEURS}\b)|,?\s+(?=${SUJETS}\s)|,?\s+(?=attention\b)|,?\s+(?=(?:ne\s+(?:jamais|surtout\s+pas|pas)|il\s+ne\s+faut)\b))`, "i"))
+    .map(s=>s&&s.trim()).filter(s=>s && s.length>1);
+  const out=[]; let alerteSuivante=false;
+  for (let p of parts){
+    p = p.replace(new RegExp(String.raw`^${CONNECTEURS}\s*,?\s*`,"i"),"").replace(/^[-•\d.)\s]+/,"").replace(/\s*[,.;]$/,"").trim();
+    if (!p || /^(?:et|alors|donc|bon|ensuite|puis|il\s+faut|il\s+faudra|faut|tu|vous|on|nous)$/i.test(p)) continue;
+    if (/^(?:attention|important|remarque|note|vérification)$/i.test(p)){ alerteSuivante=true; continue; }
+    if (alerteSuivante && out.length){
+      alerteSuivante=false; const prev=out[out.length-1];
+      const msg=cap(p.replace(/^(?:et\s+)?(?:il\s+faut(?:\s+bien)?|tu\s+dois|vous\s+devez|on\s+doit|faut)\s+/i,""));
+      prev.alerte=(prev.alerte?prev.alerte+" ":"")+msg+(/[.!?]$/.test(msg)?"":".");
+      if (prev.niveau!=="absolu") prev.niveau=/\b(jamais|interdit)\b/i.test(msg)?"absolu":"attention";
+      continue;
+    }
+    alerteSuivante=false;
+    const al = p.match(/^(?:attention|important|remarque|note|vérification)\s*[:,]?\s*(.+)$/i);
+    const interdit = /^(?:il\s+ne\s+faut|ne\s+(?:jamais|surtout\s+pas|pas))\b/i.test(p);
+    if ((al || interdit) && out.length){
+      const prev=out[out.length-1]; const msg=cap((al?al[1]:p).replace(/^il\s+ne\s+faut\s+(jamais|pas)\s+/i,"ne $1 ").replace(/^(?:il\s+)?faut\s+/i,""));
+      prev.alerte=(prev.alerte?prev.alerte+" ":"")+msg+(/[.!?]$/.test(msg)?"":".");
+      prev.niveau = (interdit || /\b(jamais|interdit)\b/i.test(msg)) ? "absolu" : (prev.niveau==="absolu"?"absolu":"attention");
+      continue;
+    }
+    const v = premierVerbe(p);
+    if (!v){
+      if (!out.length && /^pour\b/i.test(p)) continue;              /* préambule « pour lancer la calibration… » */
+      if (out.length && p.split(/\s+/).length<=14 && !/[A-ZÀ-Ý]{2}/.test(p.slice(0,3))){   /* précision sur l'étape précédente */
+        const prev=out[out.length-1]; const msg=cap(p);
+        prev.alerte=(prev.alerte?prev.alerte+" ":"")+msg+(/[.!?]$/.test(msg)?"":".");
+        if (!prev.niveau && /\b(doit|faut|vérif|bien|obligatoire|impérati)/i.test(p)) prev.niveau="attention";
+        continue;
+      }
+      const abs=/\b(jamais|interdit|surtout pas)\b/i.test(p);
+      out.push({id:uid(), action:cap(p)+".", bouton:extraireBouton(p), alerte:"", niveau:abs?"absolu":"", photo:"", box:null});
+      continue;
+    }
+    const [inf, reste] = v;
+    let b = nettoyerBouton(boutonParle(inf, reste));
+    let restePropre = reste;
+    if (b){ const low=b.toLowerCase(); const i=restePropre.toLowerCase().indexOf(low); if(i>=0) restePropre=restePropre.slice(0,i)+b+restePropre.slice(i+b.length); }
+    const action = cap(inf)+(restePropre?" "+restePropre:"")+".";
+    if (!b) b = extraireBouton(restePropre);
+    const abs=/\b(jamais|interdit|surtout pas)\b/i.test(p);
+    out.push({id:uid(), action, bouton:b, alerte:"", niveau:abs?"absolu":"", photo:"", box:null});
   }
   return out;
 }
@@ -970,8 +1075,10 @@ function stepsOf(rep){
 /* Faut-il (re)découper cette réponse à l'enregistrement ? */
 function needsSplit(rep){
   if (!rep || rep.na || !(rep.texte||"").trim()) return false;
-  const has=(rep.etapes||[]).some(e=>e.action);
-  return !has || (rep.splitFrom!==undefined && rep.splitFrom!==rep.texte);
+  const et=(rep.etapes||[]).filter(e=>e.action);
+  if (!et.length) return true;
+  const base = rep.splitFrom!==undefined ? rep.splitFrom : et.map(e=>e.action).join(" ");
+  return norm(base).replace(/\s+/g," ").trim() !== norm(rep.texte).replace(/\s+/g," ").trim();
 }
 async function autoSplit(rep, q, nom){
   const anciennes=rep.etapes||[];
