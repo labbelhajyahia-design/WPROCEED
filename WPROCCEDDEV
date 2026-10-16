@@ -1,0 +1,1171 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+<title>Procédures Automates</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0d6b7a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout : une colonne façon fiche de poste, barre d'écoute fixée en bas, panneaux plein écran pour la saisie photo */
+:root{
+  --paper:#eef2f3; --surface:#ffffff; --sunk:#e3e9eb; --ink:#10232b; --muted:#566a71; --line:#cfd9dc;
+  --accent:#0d6b7a; --accent-ink:#ffffff; --accent-soft:#d6ecef;
+  --stop:#b42318; --stop-bg:#fdecea; --warn:#9a5b00; --warn-bg:#fff2d6; --note-bg:#e8eef0;
+  --hl:#ffb000; --shade:rgba(8,20,26,.42);
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0c1417; --surface:#132024; --sunk:#0f1a1d; --ink:#e3edef; --muted:#93a7ad; --line:#24363c;
+  --accent:#4fb6c4; --accent-ink:#06191d; --accent-soft:#16343a;
+  --stop:#f2877b; --stop-bg:#371a1a; --warn:#f1b257; --warn-bg:#33270f; --note-bg:#1a292d;
+  --hl:#ffc233; --shade:rgba(0,0,0,.55); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0c1417; --surface:#132024; --sunk:#0f1a1d; --ink:#e3edef; --muted:#93a7ad; --line:#24363c;
+  --accent:#4fb6c4; --accent-ink:#06191d; --accent-soft:#16343a;
+  --stop:#f2877b; --stop-bg:#371a1a; --warn:#f1b257; --warn-bg:#33270f; --note-bg:#1a292d;
+  --hl:#ffc233; --shade:rgba(0,0,0,.55); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 120px}
+.wrap{max-width:760px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;line-height:1.1;text-wrap:balance;margin:0}
+h1{font-size:2.1rem;letter-spacing:.01em}
+h2{font-size:1.45rem}
+h3{font-size:1.15rem;font-weight:600}
+.eyebrow{font-family:var(--f-display);font-weight:600;text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;color:var(--accent)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-size:.82rem;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--hl);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font-weight:700;font-size:.95rem;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;border-color:transparent;padding:0 10px}
+.btn.small{min-height:36px;padding:0 12px;font-size:.88rem}
+.btn.danger{color:var(--stop);border-color:var(--stop)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn svg{width:18px;height:18px;flex:none}
+.icon-btn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);display:inline-grid;place-items:center;cursor:pointer;flex:none}
+.icon-btn svg{width:20px;height:20px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.top{padding-top:22px;padding-bottom:14px;display:flex;flex-direction:column;gap:6px}
+.storage{display:inline-flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+
+/* Liste des automates */
+.cards{display:grid;gap:12px;margin-top:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;cursor:pointer;text-align:left;width:100%}
+.card:hover{border-color:var(--accent)}
+.card h2{font-size:1.5rem}
+.meter{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden;margin-top:10px;max-width:260px}
+.meter i{display:block;height:100%;background:var(--accent)}
+.empty{border:2px dashed var(--line);border-radius:var(--r);padding:28px 20px;text-align:center;display:grid;gap:10px;justify-items:center;margin-top:14px}
+
+/* Vue automate */
+.back{margin-left:-10px}
+.tabs{display:flex;gap:4px;border-bottom:1.5px solid var(--line);margin-top:14px;overflow-x:auto}
+.tab{background:none;border:0;padding:12px 12px;font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);z-index:5}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:.85rem;white-space:nowrap;cursor:pointer}
+.rules{background:var(--stop-bg);border:1.5px solid var(--stop);border-radius:var(--r);padding:14px 16px;margin-top:16px}
+.rules h2{color:var(--stop);font-size:1.25rem;text-transform:uppercase;letter-spacing:.04em}
+.rules ul{margin:8px 0 0;padding-left:20px;display:grid;gap:6px}
+.rub{margin-top:26px;scroll-margin-top:60px}
+.rub-head{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:6px}
+.rub-head .num{font-family:var(--f-mono);font-size:.85rem;color:var(--accent);margin-right:6px}
+.q{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.q.todo{background:transparent;border-style:dashed}
+.steps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:12px;counter-reset:s}
+.step{display:grid;grid-template-columns:30px 1fr;gap:10px;counter-increment:s;border-radius:8px;padding:6px;margin:-6px;transition:background .2s}
+.step::before{content:counter(s);font-family:var(--f-mono);font-size:.82rem;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:500}
+.step.speaking{background:var(--accent-soft)}
+.step-body{min-width:0;display:grid;gap:6px}
+.kbd{display:inline-block;font-family:var(--f-mono);font-size:.8rem;border:1.5px solid var(--ink);border-bottom-width:3px;border-radius:6px;padding:1px 7px;background:var(--surface)}
+.alert{border-radius:6px;padding:6px 10px;font-size:.92rem;display:flex;gap:8px;align-items:flex-start}
+.alert b{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.06em;font-size:.82rem;padding-top:2px;white-space:nowrap}
+.alert.absolu{background:var(--stop-bg);color:var(--stop)}
+.alert.attention{background:var(--warn-bg);color:var(--warn)}
+.alert.note{background:var(--note-bg);color:var(--muted)}
+.alert span{color:var(--ink)}
+
+/* Photo avec bouton mis en évidence */
+.shot{position:relative;overflow:hidden;border-radius:8px;border:1px solid var(--line);max-width:420px;background:var(--sunk);line-height:0}
+.shot img{width:100%;display:block}
+.hl{position:absolute;border:3px solid var(--hl);border-radius:6px;box-shadow:0 0 0 9999px var(--shade);pointer-events:none}
+.hl::after{content:"";position:absolute;inset:-8px;border:2px solid var(--hl);border-radius:10px;animation:pulse 1.6s ease-out infinite}
+.hl-tag{position:absolute;transform:translateY(-100%);background:var(--hl);color:#1d1400;font-family:var(--f-mono);font-size:.72rem;line-height:1.3;padding:2px 6px;border-radius:4px 4px 0 0;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+@keyframes pulse{0%{opacity:.9;transform:scale(.96)}100%{opacity:0;transform:scale(1.12)}}
+@media (prefers-reduced-motion: reduce){.hl::after{animation:none;opacity:.6}}
+
+/* Saisie */
+.wizard{margin-top:16px;display:grid;gap:14px}
+.progress{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.qtext{font-family:var(--f-display);font-size:1.7rem;font-weight:600;line-height:1.15;text-wrap:balance}
+.dictee{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.mic{width:72px;height:72px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;position:relative}
+.mic svg{width:32px;height:32px}
+.mic.on{background:var(--stop)}
+.mic.on::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--stop);animation:pulse 1.2s ease-out infinite}
+textarea{width:100%;min-height:120px;border:1.5px solid var(--line);border-radius:var(--r);padding:12px;background:var(--surface);resize:vertical;line-height:1.5}
+input[type=text],select{width:100%;min-height:44px;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface)}
+label.f{display:grid;gap:4px;font-size:.88rem;color:var(--muted);font-weight:700}
+.edit-steps{display:grid;gap:10px}
+.estep{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:8px}
+.estep-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.estep .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.thumb{width:64px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.navbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hint{font-size:.85rem;color:var(--muted)}
+.form{display:grid;gap:12px;margin-top:16px}
+.form .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.estep .grid2,.form .grid2{grid-template-columns:1fr}.qtext{font-size:1.45rem}h1{font-size:1.8rem}}
+
+/* Panneau plein écran (photo) */
+.sheet{position:fixed;inset:0;background:var(--paper);z-index:40;overflow-y:auto;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px))}
+.stage{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;max-width:560px;line-height:0;border-radius:8px;overflow:hidden;border:1px solid var(--line);cursor:crosshair}
+.stage img{width:100%;display:block;pointer-events:none}
+.pick{display:grid;place-items:center;gap:8px;border:2px dashed var(--line);border-radius:var(--r);padding:30px;text-align:center;cursor:pointer;background:var(--surface)}
+
+/* Barre d'écoute */
+.player{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--ink);color:var(--paper);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 10px) max(16px,env(safe-area-inset-left,0px))}
+.player .in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.player .now{min-width:0}
+.player .now small{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.1em;opacity:.75;font-size:.75rem}
+.player .now div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player .ctl{display:flex;gap:6px;align-items:center}
+.player .icon-btn{background:transparent;border-color:rgba(255,255,255,.25);color:var(--paper)}
+.player .icon-btn.main{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.player .rate{font-family:var(--f-mono);font-size:.8rem;background:transparent;border:1px solid rgba(255,255,255,.25);color:var(--paper);border-radius:999px;min-height:36px;padding:0 10px;cursor:pointer}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 96px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;z-index:60;max-width:min(92vw,520px);font-size:.92rem;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.confirm{background:var(--stop-bg);border:1px solid var(--stop);border-radius:var(--r);padding:12px;display:grid;gap:10px}
+.search{display:flex;gap:8px;align-items:center;margin-top:14px}
+.search input{flex:1;min-width:0;min-height:46px;border:1.5px solid var(--line);border-radius:999px;padding:8px 16px;background:var(--surface)}
+mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
+.results{display:grid;gap:10px;margin-top:12px}
+.res{background:var(--surface);border:1.5px solid var(--accent);border-radius:var(--r);padding:12px 14px}
+.res-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;width:100%;background:none;border:0;padding:0;cursor:pointer;text-align:left;font-size:1rem}
+.res ul{margin:8px 0 0;padding-left:18px;display:grid;gap:6px}
+.rub-head{flex-wrap:wrap}
+.preview{border:1.5px dashed var(--accent);border-radius:var(--r);padding:12px 14px;background:var(--surface)}
+.preview .steps{margin-top:8px}
+.audio-imp{border:1.5px solid var(--line);border-radius:var(--r);padding:14px;background:var(--surface);display:grid;gap:10px}
+.audio-imp h3{display:flex;gap:8px;align-items:center}.audio-imp h3 svg{width:20px;height:20px;color:var(--accent)}
+.spinner{width:20px;height:20px;border-radius:50%;border:3px solid var(--accent-soft);border-top-color:var(--accent);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.qres{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.qres-item{width:100%;text-align:left;display:grid;gap:2px;background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;font-size:.98rem}
+.qres-item:hover{border-color:var(--accent)}
+.q-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.q-head h3{min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<div class="wrap" id="app"><div class="top"><span class="eyebrow">Fiches de poste</span><h1>Procédures Automates</h1><p class="muted">Chargement des automates…</p></div></div>
+<div class="player" id="player" hidden></div>
+<div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+/* ---------- Modèle de questions (identique au document « Modèle de procédure automate ») ---------- */
+const RUBRIQUES = [
+  {id:"alertes", titre:"Alertes et règles absolues", q:[
+    {id:"a1", t:"Qu'est-ce qu'il ne faut jamais faire sur cet automate ?"},
+    {id:"a2", t:"Quels équipements de protection porter ?"},
+    {id:"a3", t:"Quels pièges fréquents faut-il signaler ?"}]},
+  {id:"avant", titre:"Avant de démarrer", q:[
+    {id:"b1", t:"Quels consommables vérifier, et où sont-ils ?"},
+    {id:"b2", t:"Comment préparer chaque solution ?"},
+    {id:"b3", t:"Quels remplissages faut-il confirmer dans le logiciel ?"}]},
+  {id:"demarrer", titre:"Démarrer l'automate", q:[
+    {id:"c1", t:"Comment allumer l'automate et le logiciel ?"},
+    {id:"c2", t:"Quelle initialisation lancer ?"},
+    {id:"c3", t:"Quelle maintenance faire avant les tests ?"}]},
+  {id:"calibration", titre:"Calibration et contrôles qualité", q:[
+    {id:"k1", t:"Quand faut-il calibrer, et comment le savoir ?"},
+    {id:"k2", t:"Comment passer une calibration ?"},
+    {id:"k3", t:"Comment passer les contrôles qualité ?"},
+    {id:"k4", t:"Que faire si une calibration ou un contrôle est hors limites ?"}]},
+  {id:"test", titre:"Passer un test", q:[
+    {id:"d1", t:"Comment choisir la position et identifier le tube ?"},
+    {id:"d2", t:"Que vérifier avant de placer le tube ?"},
+    {id:"d3", t:"Comment lancer la série ?"}]},
+  {id:"reactifs", titre:"Réactifs et échantillons", q:[
+    {id:"e1", t:"Comment et quand changer un réactif ?"},
+    {id:"e2", t:"Comment ajouter ou remplacer un échantillon en cours ?"}]},
+  {id:"valider", titre:"Valider les résultats", q:[
+    {id:"f1", t:"Où voir les alarmes et les remarques ?"},
+    {id:"f2", t:"Que faire en cas d'alarme ?"}]},
+  {id:"arreter", titre:"Arrêter l'automate", q:[
+    {id:"g1", t:"Quelle maintenance faire après les essais ?"},
+    {id:"g2", t:"Comment quitter le logiciel et éteindre ?"}]},
+  {id:"maintenance", titre:"Maintenance et pannes", q:[
+    {id:"h1", t:"Quelles maintenances hebdomadaires ou mensuelles ?"},
+    {id:"h2", t:"Quelles erreurs fréquentes, et leur solution ?"},
+    {id:"h3", t:"Qui appeler si le problème persiste ?"}]}
+];
+const ALLQ = RUBRIQUES.flatMap((r,ri)=>r.q.map(q=>({...q, rub:r, ri})));
+const QI = Object.fromEntries(ALLQ.map(q=>[q.id,q]));
+const FICHE = [["nom","Nom de l'automate"],["fabricant","Fabricant"],["modele","Modèle"],["secteur","Paramètres / secteur"],["emplacement","Emplacement"],["referent","Technicien référent"],["sav","Numéro SAV"]];
+const NIVEAUX = {absolu:"Règle absolue", attention:"Attention", "":"Remarque"};
+const SEED = {"id": "autobio-s900", "nom": "AutoBio S900", "fabricant": "AutoBio", "modele": "S900", "secteur": "Immuno-analyse (tests hormonaux)", "emplacement": "", "referent": "", "sav": "", "reponses": {"a1": {"etapes": [{"action": "Ne jamais ouvrir le couvercle des réactifs pendant que l'automate travaille.", "bouton": "Couvercle des réactifs", "alerte": "Attendre le statut Prêt en bas à gauche de l'écran.", "niveau": "absolu"}, {"action": "Ne jamais ouvrir le couvercle des échantillons à la main.", "bouton": "Remplacer échantillon", "alerte": "Passer par Requête puis Remplacer échantillon.", "niveau": "absolu"}, {"action": "Ouvrir le bidon de tampon de lavage uniquement par le couvercle marqué d'une croix.", "bouton": "Couvercle marqué d'une croix", "alerte": "Ne pas l'ouvrir par un autre bouchon.", "niveau": "absolu"}, {"action": "Ne lancer aucun test avant la fin du nettoyage quotidien.", "bouton": "Nettoyage quotidien", "alerte": "", "niveau": "absolu"}]}, "a3": {"etapes": [{"action": "Plus de 3 tests sur un tube (ex. bilan hormonal) : certains tests peuvent ne pas s'afficher à l'écran.", "bouton": "", "alerte": "Croiser avec la fiche de paillasse et le logiciel.", "niveau": "attention"}]}, "b1": {"etapes": [{"action": "Vérifier le flacon System Wash (consommables du haut).", "bouton": "Lavage System", "alerte": "", "niveau": ""}, {"action": "Vérifier le flacon Diluant 1 (consommables du haut).", "bouton": "Diluant 1", "alerte": "", "niveau": ""}, {"action": "Vérifier les bidons du bas : eau distillée, tampon de lavage, déchets liquides.", "bouton": "", "alerte": "Ces trois niveaux sont détectés automatiquement, sans confirmation.", "niveau": ""}]}, "b2": {"etapes": [{"action": "System Wash : diluer un flacon dans 1 L d'eau, dans la bouteille à bouchon rouge.", "bouton": "", "alerte": "", "niveau": ""}, {"action": "Remplir le flacon System Wash de l'automate jusqu'au trait maximum.", "bouton": "", "alerte": "", "niveau": ""}, {"action": "Diluant 1 : remplir le flacon de l'automate jusqu'au trait maximum avec le flacon prêt à l'emploi.", "bouton": "", "alerte": "", "niveau": ""}, {"action": "Tampon de lavage : mélanger 62,5 mL du petit flacon dans 1,25 L d'eau distillée, puis verser dans le bidon.", "bouton": "Couvercle marqué d'une croix", "alerte": "Ouvrir le bidon uniquement par le couvercle marqué d'une croix.", "niveau": "absolu"}]}, "b3": {"etapes": [{"action": "Cliquer sur Lavage System et confirmer le remplissage.", "bouton": "Lavage System", "alerte": "", "niveau": ""}, {"action": "Cliquer sur Diluant 1, puis Changer Diluant 1, et confirmer le remplissage.", "bouton": "Changer Diluant 1", "alerte": "", "niveau": ""}]}, "c1": {"etapes": [{"action": "Allumer avec l'interrupteur principal, en bas à droite de l'automate.", "bouton": "Interrupteur vert", "alerte": "À confirmer : même bouton que pour l'arrêt.", "niveau": ""}, {"action": "Ouvrir le logiciel.", "bouton": "", "alerte": "", "niveau": ""}]}, "c2": {"etapes": [{"action": "Aller sur l'écran État.", "bouton": "État", "alerte": "", "niveau": ""}, {"action": "Ouvrir Initialisation.", "bouton": "Initialisation", "alerte": "", "niveau": ""}, {"action": "Cliquer sur Initialisation BBD.", "bouton": "Initialisation BBD", "alerte": "", "niveau": ""}]}, "c3": {"etapes": [{"action": "Ouvrir le menu Maintenance.", "bouton": "Maintenance", "alerte": "", "niveau": ""}, {"action": "Lancer le Nettoyage quotidien.", "bouton": "Nettoyage quotidien", "alerte": "", "niveau": ""}, {"action": "Attendre la fin complète du cycle.", "bouton": "", "alerte": "Aucun test avant la fin du cycle.", "niveau": "absolu"}]}, "d1": {"etapes": [{"action": "Ouvrir la section Requête.", "bouton": "Requête", "alerte": "", "niveau": ""}, {"action": "Cliquer sur une position libre : elle devient bleue avec un cadre noir.", "bouton": "Position", "alerte": "", "niveau": ""}, {"action": "Cliquer dans le champ Id et scanner le code-barres du tube.", "bouton": "Id", "alerte": "", "niveau": ""}, {"action": "Placer le tube dans la position sélectionnée et vérifier qu'il est bien installé.", "bouton": "", "alerte": "", "niveau": ""}]}, "d2": {"etapes": [{"action": "Vérifier que le tube correspond au patient et à la fiche de paillasse.", "bouton": "", "alerte": "", "niveau": ""}, {"action": "Vérifier la liste des tests demandés.", "bouton": "", "alerte": "Plus de 3 tests : certains peuvent ne pas s'afficher. Croiser avec la fiche de paillasse et le logiciel.", "niveau": "attention"}]}, "d3": {"etapes": [{"action": "Une fois toutes les requêtes saisies, appuyer sur le bouton Play (bleu, en haut de l'écran).", "bouton": "Play", "alerte": "", "niveau": ""}]}, "e1": {"etapes": [{"action": "Regarder le statut en bas à gauche de l'écran.", "bouton": "Statut", "alerte": "", "niveau": ""}, {"action": "Statut Exécution : ne pas toucher le couvercle des réactifs, attendre.", "bouton": "", "alerte": "Ouverture interdite en mode Exécution.", "niveau": "absolu"}, {"action": "Statut Prêt : ouvrir le couvercle des réactifs et changer le réactif.", "bouton": "Prêt", "alerte": "", "niveau": ""}]}, "e2": {"etapes": [{"action": "Aller dans Requête, puis Remplacer échantillon.", "bouton": "Remplacer échantillon", "alerte": "", "niveau": ""}, {"action": "Attendre la fin du décompte en secondes et lire les notifications en bas de l'écran.", "bouton": "", "alerte": "", "niveau": ""}, {"action": "Ajouter ou remplacer le tube quand le système l'autorise.", "bouton": "", "alerte": "Ne jamais ouvrir le couvercle des échantillons à la main.", "niveau": "absolu"}]}, "f1": {"etapes": [{"action": "À la fin de l'exécution, ouvrir l'onglet Détails.", "bouton": "Détails", "alerte": "", "niveau": ""}, {"action": "Rechercher les alarmes et remarques sur chaque réaction, puis valider techniquement.", "bouton": "", "alerte": "", "niveau": ""}]}, "g1": {"etapes": [{"action": "Ouvrir le menu Maintenance.", "bouton": "Maintenance", "alerte": "", "niveau": ""}, {"action": "Cliquer sur Maintenance côté, puis Exécuter.", "bouton": "Exécuter", "alerte": "", "niveau": ""}, {"action": "Attendre la fin du cycle.", "bouton": "", "alerte": "", "niveau": ""}]}, "g2": {"etapes": [{"action": "Appuyer sur le bouton d'arrêt du logiciel et choisir Quitter le logiciel.", "bouton": "Quitter le logiciel", "alerte": "", "niveau": ""}, {"action": "Éteindre avec l'interrupteur principal (bouton vert, en bas à droite).", "bouton": "Interrupteur vert", "alerte": "", "niveau": ""}]}}};
+/* Mots-clés pour ranger une procédure importée sans Claude */
+const KW = {a1:["jamais","interdit","ne pas ouvrir","ne pas toucher","regle absolue"],a2:["gants","blouse","lunettes","protection","epi","masque"],a3:["piege","attention","risque"],
+  b1:["consommable","flacon","bidon","niveau","dechets","eau distillee"],b2:["diluer","melanger","preparer"," ml","solution","tampon"],b3:["confirmer","remplissage"],
+  c1:["allumer","interrupteur","mise en marche","demarrer l'automate","ouvrir le logiciel"],c2:["initialisation","initialiser"],c3:["nettoyage quotidien","avant de lancer","avant les tests"],
+  k1:["peremption","echeance","expire","quand calibrer","courbe"],k2:["calibration","calibrer","calibrateur","etalon"],k3:["controle qualite","controles","cq","niveau 1","niveau 2"],k4:["hors limites","hors limite","westgard","rejet","non conforme"],
+  d1:["position","requete","code-barres","code barre","scanner","champ id","tube"],d2:["fiche de paillasse","identite","patient"],d3:["play","lancer la serie","lancer l'automate"],
+  e1:["reactif","couvercle des reactifs"],e2:["echantillon","remplacer echantillon","urgence"],f1:["details","alarme","remarque","valider"],f2:["en cas d'alarme","repasser","refaire"],
+  g1:["maintenance cote","apres l'essai","fin de journee","decontamination"],g2:["quitter","eteindre","arret"],h1:["hebdomadaire","mensuelle","mensuel"],h2:["erreur","panne","bloque","bourrage"],h3:["sav","appeler","referent","hotline"]};
+
+/* ---------- Outils ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-5);
+const clone = o => JSON.parse(JSON.stringify(o));
+const clamp = (v,a=0,b=1) => Math.min(b, Math.max(a, Number(v)||0));
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const I = {
+  mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>',
+  prev:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>',
+  next:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>',
+  speak:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/></svg>',
+  target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12l1.2 5 1.8-4 1.8 4 1.2-5"/></svg>',
+  wand:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20L15 9M14 4v3M19 9h-3M17.5 5.5l-2 2M11 4.5l1 1.5M19.5 12l-1.5-1"/></svg>'
+};
+let toastT;
+function toast(msg, ms=3800){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms); }
+function blobToDataURL(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(b); }); }
+async function compress(file, max=1400, q=.82){
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const k = Math.min(1, max/Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    return await new Promise(res=>c.toBlob(b=>res(b||file),"image/jpeg",q));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/* ---------- Stockage : base partagée de la page, sinon mémoire du téléphone ---------- */
+const idb = { d:null,
+  open(){ return new Promise(res=>{ let r; try{ r=indexedDB.open("procedures-automates",1); }catch(e){ return res(); }
+    r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore("automates",{keyPath:"id"}); d.createObjectStore("photos",{keyPath:"id"}); };
+    r.onsuccess=()=>{ this.d=r.result; res(); }; r.onerror=()=>res(); }); },
+  tx(store, mode, fn){ return new Promise((res,rej)=>{ if(!this.d) return res(undefined);
+    const t=this.d.transaction(store,mode), q=fn(t.objectStore(store)); t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); }); },
+  all(s){ return this.tx(s,"readonly",st=>st.getAll()).then(r=>r||[]); },
+  get(s,k){ return this.tx(s,"readonly",st=>st.get(k)); },
+  put(s,v){ return this.tx(s,"readwrite",st=>st.put(v)); },
+  del(s,k){ return this.tx(s,"readwrite",st=>st.delete(k)); }
+};
+const Store = { mode:"local", db:null, assets:null, sample:null, downloads:null, images:false, cache:[], loaded:false, urls:new Map(),
+  async init(){
+    if (window.claude && typeof claude.use === "function"){
+      try { const db = await claude.use("db"); if (db){ this.db=db; this.mode="db"; } } catch(e){}
+      claude.use("assets").then(a=>{ this.assets=a; }).catch(()=>{});
+      claude.use("downloads").then(d=>{ this.downloads=d; }).catch(()=>{});
+      claude.use("sample").then(async s=>{ this.sample=s; if(s){ const l=await s.limits().catch(()=>null); this.images=!!(l&&l.images); } render(); }).catch(()=>{});
+    }
+    if (this.mode==="db"){
+      this.db.collection("automates").onSnapshot(snap=>{
+        this.cache = snap.docs.map(d=>({...d.data(), id:d.id}));
+        this.loaded=true;
+        const ae=document.activeElement;
+        if (((S.view==="auto" && S.tab==="saisir") || S.view==="import") && ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+        if (!$("#sheet").hidden) return;
+        render();
+      }, err=>{ this.loaded=true; render(); toast("Lecture impossible : "+(err&&err.message||"réessayez plus tard")); });
+    } else {
+      await idb.open();
+      this.cache = await idb.all("automates").catch(()=>[]);
+      let seeded=false; try{ seeded = localStorage.getItem("pa-seeded")==="1"; }catch(e){}
+      if (!this.cache.length && SEED && !seeded){ const a=prepare(clone(SEED)); this.cache=[a]; await idb.put("automates",a).catch(()=>{}); try{ localStorage.setItem("pa-seeded","1"); }catch(e){} }
+      this.loaded=true; render();
+    }
+  },
+  get(id){ return this.cache.find(a=>a.id===id); },
+  async save(a){
+    a.maj = new Date().toISOString();
+    const c = clone(a);
+    if (this.mode==="db"){ const {id, ...body}=c; await this.db.doc("automates/"+id).set(body); }
+    else { await idb.put("automates", c); }
+    const i=this.cache.findIndex(x=>x.id===c.id); if(i>=0) this.cache[i]=c; else this.cache.push(c);
+  },
+  async remove(id){
+    if (this.mode==="db") await this.db.doc("automates/"+id).delete(); else await idb.del("automates", id);
+    this.cache = this.cache.filter(a=>a.id!==id);
+  },
+  async putPhoto(blob){
+    if (this.mode==="db"){
+      if (this.assets){ const r = await this.assets.upload(blob); this.urls.set("asset:"+r.id, r.url); return "asset:"+r.id; }
+      const data = await blobToDataURL(blob); const pid=uid(); await this.db.doc("photos/"+pid).set({data}); return "photo:"+pid;
+    }
+    const pid=uid(); await idb.put("photos",{id:pid, blob}); return "local:"+pid;
+  },
+  async photoURL(ref){
+    if (!ref) return "";
+    if (this.urls.has(ref)) return this.urls.get(ref);
+    let u="";
+    try{
+      if (ref.startsWith("asset:")) u = "/_blob/"+ref.slice(6);
+      else if (ref.startsWith("photo:") && this.db){ const s=await this.db.doc("photos/"+ref.slice(6)).get(); u = s.exists ? s.data().data : ""; }
+      else if (ref.startsWith("local:")){ const r=await idb.get("photos", ref.slice(6)); u = r ? URL.createObjectURL(r.blob) : ""; }
+      else if (ref.startsWith("data:")) u = ref;
+    }catch(e){}
+    if (u) this.urls.set(ref,u);
+    return u;
+  },
+  async photoBlob(ref){ const u=await this.photoURL(ref); if(!u) return null; const r=await fetch(u); return r.ok ? r.blob() : null; }
+};
+function prepare(a){
+  a.reponses = a.reponses || {};
+  for (const k in a.reponses){ const r=a.reponses[k]; r.etapes=(r.etapes||[]).map(e=>({id:e.id||uid(), action:e.action||"", bouton:e.bouton||"", alerte:e.alerte||"", niveau:e.niveau||"", photo:e.photo||"", box:e.box||null})); if(r.texte==null) r.texte=r.etapes.map(e=>e.action).join(" "); }
+  return a;
+}
+const isNA = (a,qid) => !!(a.reponses&&a.reponses[qid]&&a.reponses[qid].na);
+const hasContent = (a,qid) => { const r=a.reponses&&a.reponses[qid]; return !!(r && !r.na && ((r.etapes&&r.etapes.some(e=>e.action)) || (r.texte&&r.texte.trim()))); };
+const answered = (a,qid) => isNA(a,qid) || hasContent(a,qid);
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const terms = q => norm(q).split(/\s+/).filter(w=>w.length>1);
+function hay(a,q){ q=QI[q.id]; const r=a.reponses[q.id]||{}; return norm([q.rub.titre,q.t,r.texte,...(r.etapes||[]).flatMap(e=>[e.action,e.bouton,e.alerte])].join(" ")); }
+function matchQ(a,q,ts){ if(!ts.length) return true; q=QI[q.id]; if(!hasContent(a,q.id) && !ts.every(w=>norm(q.rub.titre+" "+q.t).includes(w))) return false; const h=hay(a,q); return ts.every(w=>h.includes(w)); }
+function hi(t, ts){ t=String(t??""); if(!ts||!ts.length) return esc(t);
+  const chars=[...t]; let n=""; const map=[]; chars.forEach((c,i)=>{ for(const ch of norm(c)){ n+=ch; map.push(i); } });
+  const mk=new Array(chars.length).fill(false); ts.forEach(w=>{ let p=n.indexOf(w); while(p>=0){ for(let k=p;k<p+w.length;k++) mk[map[k]]=true; p=n.indexOf(w,p+1); } });
+  let out="", on=false; chars.forEach((c,i)=>{ if(mk[i]&&!on){out+="<mark>";on=true;} if(!mk[i]&&on){out+="</mark>";on=false;} out+=esc(c); }); return on?out+"</mark>":out; }
+const countAnswered = a => ALLQ.filter(q=>answered(a,q.id)).length;
+
+/* ---------- État de l'écran ---------- */
+const S = { view:"list", autoId:null, tab:"lire", qi:0, draft:null, confirmDel:false, search:"", searchAll:"", importAfter:false, imp:{texte:"", result:null, busy:false} };
+function current(){ return S.autoId ? Store.get(S.autoId) : null; }
+function go(view, extra={}){ stopRec(); Object.assign(S, {view}, extra); render(); window.scrollTo(0,0); }
+
+/* ---------- Rendu ---------- */
+function render(){
+  const app = $("#app");
+  if (!Store.loaded){ return; }
+  const ae=document.activeElement, fid=ae&&ae.id&&app.contains(ae)?ae.id:null, sel=fid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
+  renderInner(app);
+  if(fid){ const el=document.getElementById(fid); if(el){ el.focus({preventScroll:true}); if(sel&&el.setSelectionRange) try{ el.setSelectionRange(sel[0],sel[1]); }catch(e){} } }
+}
+function renderInner(app){
+  if (S.view==="list") app.innerHTML = viewList();
+  else if (S.view==="new") app.innerHTML = viewNew();
+  else if (S.view==="import"){ const a=current(); if(!a){ S.view="list"; return renderInner(app); } app.innerHTML = viewImport(a); }
+  else if (S.view==="auto"){
+    const a = current(); if(!a){ S.view="list"; return renderInner(app); }
+    if (S.tab==="saisir" && (!S.draft || S.draft.id!==a.id)) S.draft = prepare(clone(a));
+    app.innerHTML = viewAuto(a);
+  }
+  hydratePhotos(app);
+  markSpeaking(false);
+}
+function storageLine(){
+  return Store.mode==="db"
+    ? '<span class="storage"><span class="dot"></span>Partagé avec les personnes qui ont accès à cette page</span>'
+    : '<span class="storage"><span class="dot"></span>Enregistré sur cet appareil</span>';
+}
+function viewList(){
+  const list = [...Store.cache].sort((a,b)=>(a.nom||"").localeCompare(b.nom||"","fr"));
+  return `<header class="top"><span class="eyebrow">Fiches de poste · laboratoire</span><h1>Procédures Automates</h1>${storageLine()}</header>
+  <div class="row"><button class="btn primary" data-act="new">${I.plus}Ajouter un automate</button><button class="btn" data-act="new-import">${I.wand}Importer une procédure complète</button></div>
+  ${list.length ? `${searchBox("searchall", S.searchAll, "Rechercher dans toutes les procédures (ex. calibration, réactif, Play)")}${S.searchAll.trim()?globalResults(list):""}<div class="cards">${list.map(a=>{ const n=countAnswered(a), p=Math.round(n/ALLQ.length*100);
+    return `<div class="card" role="button" tabindex="0" data-act="open" data-id="${esc(a.id)}">
+      <div style="min-width:0"><h2>${esc(a.nom||"Sans nom")}</h2>
+      <div class="mono muted">${esc([a.fabricant,a.modele].filter(Boolean).join(" · ")||"Fabricant non renseigné")}</div>
+      <div class="meter" aria-hidden="true"><i style="width:${p}%"></i></div>
+      <div class="muted" style="font-size:.85rem;margin-top:4px">${n} / ${ALLQ.length} questions renseignées</div></div>
+      <button class="icon-btn" data-act="listen-all" data-id="${esc(a.id)}" aria-label="Écouter la procédure de ${esc(a.nom)}">${I.speak}</button></div>`; }).join("")}</div>`
+  : `<div class="empty"><h2>Aucun automate</h2><p class="muted">Ajoutez votre premier automate, puis répondez aux ${ALLQ.length} questions du modèle à la voix ou au clavier. La procédure s'écrit au fur et à mesure.</p><button class="btn primary" data-act="new">${I.plus}Ajouter un automate</button></div>`}`;
+}
+function qResults(d){
+  const ts=terms(S.qsearch||""); if(!ts.length) return "";
+  const hits=ALLQ.map((q,i)=>({q,i})).filter(({q})=>{ const h=norm(q.rub.titre+" "+q.t)+" "+(hasContent(d,q.id)?stepsOf(d.reponses[q.id]).map(e=>norm(e.action+" "+e.bouton+" "+e.alerte)).join(" ")+" "+norm(d.reponses[q.id].texte):""); return ts.every(w=>h.includes(w)); });
+  if(!hits.length) return `<p class="muted" style="margin:6px 0 0">Aucune question ne contient « ${esc(S.qsearch)} ».</p>`;
+  return `<ul class="qres">${hits.slice(0,10).map(({q,i})=>{ const st=isNA(d,q.id)?"Sans objet":hasContent(d,q.id)?"Renseignée":"À compléter";
+    const ex=hasContent(d,q.id)?stepsOf(d.reponses[q.id]).find(e=>ts.every(w=>norm(e.action+" "+e.bouton+" "+e.alerte).includes(w))):null;
+    return `<li><button class="qres-item" data-act="goq" data-i="${i}"><span class="eyebrow">${q.ri+1}. ${esc(q.rub.titre)} · ${st}</span><span>${hi(q.t,ts)}</span>${ex?`<span class="muted" style="font-size:.88rem">${hi(ex.action,ts)}</span>`:""}</button></li>`; }).join("")}</ul>
+    ${hits.length>10?`<p class="hint">… et ${hits.length-10} autres : précisez la recherche.</p>`:""}`;
+}
+function searchBox(id, val, ph){
+  return `<div class="search" role="search"><input type="search" id="${id}" value="${esc(val)}" placeholder="${esc(ph)}" aria-label="Rechercher" autocomplete="off">
+    <button class="icon-btn" data-act="voice-search" data-target="${id}" aria-label="Rechercher à la voix">${I.mic}</button></div>`;
+}
+function globalResults(list){
+  const ts=terms(S.searchAll); let total=0;
+  const blocks=list.map(a=>{ const qs=ALLQ.filter(q=>hasContent(a,q.id)&&matchQ(a,q,ts)); total+=qs.length; if(!qs.length) return "";
+    return `<div class="res"><button class="res-head" data-act="open-search" data-id="${esc(a.id)}"><strong>${esc(a.nom)}</strong><span class="muted">${qs.length} résultat${qs.length>1?"s":""} · ouvrir</span></button>
+      <ul>${qs.slice(0,4).map(q=>`<li><span class="eyebrow">${esc(q.rub.titre)}</span><br>${hi(q.t,ts)}</li>`).join("")}${qs.length>4?`<li class="muted">… et ${qs.length-4} autres</li>`:""}</ul></div>`; }).join("");
+  return total?`<div class="results">${blocks}</div>`:`<p class="muted" style="margin-top:12px">Aucun passage ne contient « ${esc(S.searchAll)} ».</p>`;
+}
+function ficheFields(a){
+  return `<div class="grid2">${FICHE.map(([k,l])=>`<label class="f">${l}<input type="text" id="f-${k}" data-fiche="${k}" value="${esc(a[k]||"")}" ${k==="nom"?'autocomplete="off" enterkeyhint="done"':''}></label>`).join("")}</div>`;
+}
+function viewNew(){
+  return `<header class="top"><button class="btn ghost back" data-act="home">${I.back}Automates</button><span class="eyebrow">Nouvel automate</span><h1>Fiche d'identité</h1></header>
+  <form class="form" id="newform">${ficheFields({})}<p class="hint">Seul le nom est obligatoire. Les questions de la procédure viennent juste après.</p>
+  <div class="row"><button class="btn primary" type="button" id="createbtn" data-act="create">${S.importAfter?"Créer et importer la procédure":"Créer et répondre aux questions"}</button><button class="btn" type="button" data-act="home">Annuler</button></div></form>`;
+}
+function viewAuto(a){
+  const tabs=[["lire","Procédure"],["saisir","Saisir"],["fiche","Fiche"]];
+  return `<header class="top"><button class="btn ghost back" data-act="home">${I.back}Automates</button>
+    <span class="eyebrow">${esc([a.fabricant,a.modele].filter(Boolean).join(" · ")||"Automate")}</span><h1>${esc(a.nom)}</h1>
+    <span class="muted" style="font-size:.88rem">${countAnswered(a)} / ${ALLQ.length} questions renseignées${a.maj?` · mis à jour le ${new Date(a.maj).toLocaleDateString("fr-FR")}`:""}</span></header>
+  <div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button class="tab" role="tab" aria-selected="${S.tab===k}" data-act="tab" data-tab="${k}">${l}</button>`).join("")}</div>
+  ${S.tab==="lire"?viewLire(a):S.tab==="saisir"?viewSaisir(S.draft):viewFiche(a)}`;
+}
+function alertHTML(e,ts){ if(!e.alerte && !e.niveau) return "";
+  const lv = e.niveau||"note";
+  return `<div class="alert ${lv}"><b>${NIVEAUX[e.niveau]||"Remarque"}</b>${e.alerte?`<span>${hi(e.alerte,ts)}</span>`:""}</div>`; }
+function shotHTML(e){
+  if(!e.photo) return "";
+  const b=e.box;
+  return `<div class="shot"><img data-ref="${esc(e.photo)}" alt="Photo de l'étape : ${esc(e.action)}">${b?`<div class="hl" style="left:${b.x*100}%;top:${b.y*100}%;width:${b.w*100}%;height:${b.h*100}%"></div>${e.bouton?`<div class="hl-tag" style="left:${b.x*100}%;top:${b.y*100}%">${esc(e.bouton)}</div>`:""}`:""}</div>`;
+}
+function viewLire(a){
+  const ts=terms(S.search), searching=ts.length>0;
+  const absolus = ALLQ.flatMap(q=>hasContent(a,q.id)?stepsOf(a.reponses[q.id]).filter(e=>e.niveau==="absolu"):[]);
+  let found=0, shown=0;
+  const rubs = RUBRIQUES.map((r,ri)=>{
+    const qs=r.q.filter(q=>!isNA(a,q.id) && matchQ(a,q,ts));
+    if(searching && !qs.length) return "";
+    shown += qs.length;
+    const allNA = r.q.every(q=>isNA(a,q.id));
+    const anyContent = r.q.some(q=>hasContent(a,q.id));
+    found += qs.filter(q=>hasContent(a,q.id)).length;
+    return `<section class="rub" id="rub-${r.id}"><div class="rub-head"><h2><span class="num">${String(ri+1).padStart(2,"0")}</span>${esc(r.titre)}</h2>
+      ${anyContent?`<div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn small" data-act="word-rub" data-rub="${r.id}" aria-label="Exporter la rubrique ${esc(r.titre)} en Word">${I.doc}Word</button><button class="btn small" data-act="listen-rub" data-rub="${r.id}" aria-label="Écouter la rubrique ${esc(r.titre)}">${I.speak}Écouter</button></div>`:""}</div>
+      ${allNA?`<p class="muted">Sans objet pour cet automate.</p>`:qs.map(q=>{ const rep=a.reponses[q.id];
+        if(!hasContent(a,q.id)) return `<div class="q todo"><h3>${esc(q.t)}</h3><div class="row" style="margin-top:6px"><span class="muted">À compléter</span><button class="btn small" data-act="answer" data-q="${q.id}">${I.mic}Répondre</button><button class="btn small ghost" data-act="set-na" data-q="${q.id}">Sans objet</button></div></div>`;
+        const et=stepsOf(rep);
+        return `<div class="q"><div class="q-head"><h3>${hi(q.t,ts)}</h3><button class="btn small" data-act="answer" data-q="${q.id}" aria-label="Corriger : ${esc(q.t)}">Corriger</button></div>${et.length?`<ol class="steps">${et.map((e,i)=>`<li class="step" data-key="${q.id}:${i}"><div class="step-body">
+          <div>${fmtAction(e.action,ts)}${e.bouton?` <span class="kbd">${hi(e.bouton,ts)}</span>`:""}</div>${alertHTML(e,ts)}${shotHTML(e)}</div></li>`).join("")}</ol>`
+          :`<p style="margin:8px 0 0" data-key="${q.id}:t">${hi(rep.texte,ts)}</p>`}</div>`; }).join("")}
+    </section>`; }).join("");
+  return `${searchBox("search", S.search, "Rechercher : calibration, réactif, arrêter…")}
+  ${searching?`<div class="row" style="margin-top:10px"><span class="muted">${found} passage${found>1?"s":""} trouvé${found>1?"s":""}</span>${found?`<button class="btn small" data-act="listen-found">${I.speak}Écouter les résultats</button>`:""}<button class="btn small ghost" data-act="clear-search">Effacer la recherche</button></div>`
+  :`<nav class="chips" aria-label="Rubriques">${RUBRIQUES.map((r,i)=>`<button class="chip" data-act="jump" data-rub="${r.id}">${i+1}. ${esc(r.titre)}</button>`).join("")}</nav>
+  <div class="row" style="margin-top:8px"><button class="btn primary" data-act="listen-all" data-id="${esc(a.id)}">${I.play}Écouter toute la procédure</button><button class="btn" data-act="word-all">${I.doc}Procédure complète en Word</button></div>
+  ${absolus.length?`<section class="rules"><h2>Règles absolues</h2><ul>${absolus.map(e=>`<li><strong>${esc(e.action)}</strong>${e.alerte?` <span class="muted">${esc(e.alerte)}</span>`:""}</li>`).join("")}</ul></section>`:""}`}
+  ${searching&&!shown?`<p class="muted" style="margin-top:16px">Aucun passage ne contient « ${esc(S.search)} ». Essayez un autre mot, par exemple le nom d'un bouton.</p>`:rubs}`;
+}
+function viewSaisir(d){
+  const q=ALLQ[S.qi], rep=d.reponses[q.id]||{texte:"",etapes:[]};
+  const sr = !!(window.SpeechRecognition||window.webkitSpeechRecognition);
+  return `<div class="wizard">
+    <div class="row"><button class="btn small" data-act="go-import">${I.wand}Importer une procédure complète</button><span class="hint">Texte ou dictée, rangés automatiquement dans les questions.</span></div>
+    <div class="progress"><span class="eyebrow">${q.ri+1}. ${esc(q.rub.titre)}</span><span class="mono muted">Question ${S.qi+1} / ${ALLQ.length}</span></div>
+    <div class="meter" style="max-width:none;margin:0"><i style="width:${(S.qi+1)/ALLQ.length*100}%"></i></div>
+    ${searchBox("qsearch", S.qsearch||"", "Chercher une question : calibration, réactif, arrêt…")}
+    <div id="qresults">${qResults(d)}</div>
+    <label class="f">Aller à la question<select id="qpick" data-act="qpick">${ALLQ.map((x,i)=>`<option value="${i}" ${i===S.qi?"selected":""}>${isNA(d,x.id)?"— ":hasContent(d,x.id)?"✓ ":""}${x.ri+1}. ${esc(x.t)}</option>`).join("")}</select></label>
+    <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><p class="qtext" style="margin:0">${esc(q.t)}</p>
+      <button class="icon-btn" data-act="say-q" aria-label="Lire la question à voix haute">${I.speak}</button></div>
+    <label class="row" style="gap:8px;font-size:.95rem"><input type="checkbox" id="na" ${rep.na?"checked":""} style="width:20px;height:20px"> Sans objet : cette question ne s'applique pas à cet automate</label>
+    ${rep.na?"":`<div class="dictee"><button class="mic ${REC?"on":""}" id="micbtn" data-act="mic" aria-label="${REC?"Arrêter la dictée":"Dicter la réponse"}">${I.mic}</button>
+      <div class="hint">${REC?"<strong>Dictée en cours.</strong> Dites « étape suivante » entre deux actions, « question suivante » pour passer à la suite.":(sr?"Touchez le micro et décrivez les actions dans l'ordre. Dites « étape suivante » entre deux actions.":"Ici, la dictée passe par le clavier : touchez la zone de texte puis le micro du clavier Android. Dites « étape suivante » entre deux actions.")}</div></div>
+    <label class="f">Réponse<textarea id="answer" data-q="${q.id}" placeholder="Écrivez, collez ou dictez la procédure. Ex. : Aller dans le menu « Maintenance », étape suivante, cliquer sur « Nettoyage quotidien »…">${esc(rep.texte||"")}</textarea></label>
+    <div id="preview">${previewHTML(rep)}</div>
+    <div class="row"><button class="btn primary" data-act="split">${I.wand}${Store.sample?"Mettre en étapes avec Claude":"Mettre en étapes"}</button><button class="btn" data-act="add-step">${I.plus}Ajouter une étape</button></div>
+    <div class="edit-steps">${(rep.etapes||[]).map((e,i)=>stepEditor(e,i,rep.etapes.length)).join("")}</div>`}
+    <div class="navbar"><button class="btn" data-act="prevq" ${S.qi===0?"disabled":""}>${I.back}Précédente</button>
+      <div class="row"><button class="btn" data-act="save">Enregistrer</button><button class="btn primary" data-act="nextq">${S.qi===ALLQ.length-1?"Enregistrer et terminer":"Enregistrer et suivante"}</button></div></div>
+  </div>`;
+}
+function stepEditor(e,i,n){
+  return `<div class="estep" data-i="${i}"><div class="estep-head"><span class="eyebrow">Étape ${i+1}</span>
+    <div class="row" style="gap:4px"><button class="icon-btn" data-act="st-up" data-i="${i}" ${i===0?"disabled":""} aria-label="Monter l'étape">${I.up}</button>
+    <button class="icon-btn" data-act="st-down" data-i="${i}" ${i===n-1?"disabled":""} aria-label="Descendre l'étape">${I.down}</button>
+    <button class="icon-btn" data-act="st-del" data-i="${i}" aria-label="Supprimer l'étape">${I.trash}</button></div></div>
+    <label class="f">Action<input type="text" id="st-${e.id}-action" data-st="${i}" data-k="action" value="${esc(e.action)}"></label>
+    <div class="grid2"><label class="f">Bouton ou menu utilisé<input type="text" id="st-${e.id}-bouton" data-st="${i}" data-k="bouton" value="${esc(e.bouton)}" placeholder="Libellé exact à l'écran"></label>
+    <label class="f">Type d'alerte<select id="st-${e.id}-niveau" data-st="${i}" data-k="niveau"><option value="" ${!e.niveau?"selected":""}>Aucune / remarque</option><option value="attention" ${e.niveau==="attention"?"selected":""}>Attention</option><option value="absolu" ${e.niveau==="absolu"?"selected":""}>Règle absolue</option></select></label></div>
+    <label class="f">Alerte ou remarque (facultatif)<input type="text" id="st-${e.id}-alerte" data-st="${i}" data-k="alerte" value="${esc(e.alerte)}"></label>
+    <div class="row">${e.photo?`<img class="thumb" data-ref="${esc(e.photo)}" alt="">`:""}<button class="btn small" data-act="photo" data-i="${i}">${I.cam}${e.photo?(e.box?"Photo et bouton encadré":"Photo : encadrer le bouton"):"Ajouter une photo"}</button></div>
+  </div>`;
+}
+function viewFiche(a){
+  return `<form class="form" id="ficheform">${ficheFields(a)}<div class="row"><button class="btn primary" type="button" data-act="save-fiche">Enregistrer la fiche</button></div></form>
+  <section style="margin-top:28px;display:grid;gap:10px"><h2>Partager la procédure</h2>
+    <div class="row"><button class="btn primary" data-act="word-all">${I.doc}Procédure complète (Word)</button><button class="btn" data-act="copy">Copier le texte</button>${Store.downloads?`<button class="btn" data-act="dl-txt">Télécharger (.txt)</button><button class="btn" data-act="dl-json">Sauvegarde (.json)</button>`:""}</div>
+    <p class="hint">Le fichier Word reprend les questions, les étapes, les alertes et les photos avec le bouton encadré. Pour une seule rubrique, utilisez le bouton Word de cette rubrique dans l'onglet Procédure.</p></section>
+  <section style="margin-top:28px;display:grid;gap:10px"><h2>Supprimer</h2>
+  ${S.confirmDel?`<div class="confirm"><strong>Supprimer « ${esc(a.nom)} » et toutes ses réponses ?</strong><div class="row"><button class="btn danger" data-act="del-yes">Supprimer définitivement</button><button class="btn" data-act="del-no">Annuler</button></div></div>`
+  :`<div><button class="btn danger" data-act="del">${I.trash}Supprimer cet automate</button></div>`}</section>`;
+}
+async function hydratePhotos(root){
+  for (const img of root.querySelectorAll("img[data-ref]")){
+    const u = await Store.photoURL(img.dataset.ref);
+    if (u) img.src=u; else img.alt="Photo indisponible";
+  }
+}
+
+/* ---------- Texte de la procédure (copie et téléchargement) ---------- */
+function procedureText(a){
+  const L=[`PROCÉDURE — ${a.nom}`, [a.fabricant,a.modele].filter(Boolean).join(" · "), ""];
+  FICHE.slice(3).forEach(([k,l])=>{ if(a[k]) L.push(`${l} : ${a[k]}`); });
+  RUBRIQUES.forEach((r,ri)=>{ L.push("", `${ri+1}. ${r.titre.toUpperCase()}`);
+    r.q.forEach(q=>{ L.push("", q.t); const rep=a.reponses[q.id];
+      if(isNA(a,q.id)){ L.push("  Sans objet pour cet automate"); return; }
+      if(!hasContent(a,q.id)){ L.push("  À compléter"); return; }
+      const ets=stepsOf(rep);
+      if(ets.length) ets.forEach((e,i)=>{ L.push(`  ${i+1}. ${e.action}${e.bouton?` [${e.bouton}]`:""}`); if(e.alerte) L.push(`     ${(NIVEAUX[e.niveau]||"Remarque").toUpperCase()} : ${e.alerte}`); });
+      else L.push("  "+rep.texte); }); });
+  return L.join("\n");
+}
+
+/* ---------- Lecture audio ---------- */
+const TTS = { q:[], i:0, playing:false, tok:0, rate:1, voice:null, ok:"speechSynthesis" in window,
+  init(){ if(!this.ok) return; const pick=()=>{ const v=speechSynthesis.getVoices(); this.voice=v.find(x=>/^fr[-_]FR/i.test(x.lang))||v.find(x=>/^fr/i.test(x.lang))||null; }; pick(); try{ speechSynthesis.addEventListener("voiceschanged",pick); }catch(e){} },
+  say(text, after){ if(!this.ok){ if(after) after(); return; } this.stop(); const tok=this.tok; const u=this.utt(text); if(after) u.onend=()=>{ if(tok===this.tok) after(); }; speechSynthesis.speak(u); },
+  utt(text){ const u=new SpeechSynthesisUtterance(text); u.lang="fr-FR"; if(this.voice) u.voice=this.voice; u.rate=this.rate; return u; },
+  start(items, label){ if(!this.ok){ toast("La lecture audio n'est pas disponible sur cet appareil."); return; } if(!items.length){ toast("Rien à lire pour l'instant : la procédure est vide."); return; }
+    this.q=items; this.i=0; this.label=label; this.playing=true; this.speak(); },
+  speak(){ const tok=++this.tok; speechSynthesis.cancel(); const it=this.q[this.i];
+    if(!it){ this.stop(); toast("Fin de la lecture."); return; }
+    drawPlayer(); markSpeaking(true);
+    const u=this.utt(it.text); u.onend=()=>{ if(tok!==this.tok||!this.playing) return; this.i++; this.speak(); };
+    u.onerror=()=>{}; speechSynthesis.speak(u); },
+  toggle(){ if(this.playing){ this.playing=false; this.tok++; speechSynthesis.cancel(); drawPlayer(); } else { this.playing=true; this.speak(); } },
+  move(d){ this.i=Math.max(0,Math.min(this.q.length-1,this.i+d)); this.playing=true; this.speak(); },
+  stop(silent){ this.playing=false; this.tok++; if(this.ok) speechSynthesis.cancel(); if(!silent){ this.q=[]; drawPlayer(); markSpeaking(); } }
+};
+function itemsFor(a, rubIds, qids){
+  const out=[];
+  RUBRIQUES.forEach((r,ri)=>{ if(rubIds && !rubIds.includes(r.id)) return;
+    const qs=r.q.filter(q=>hasContent(a,q.id) && (!qids||qids.includes(q.id))); if(!qs.length) return;
+    out.push({text:`Rubrique ${ri+1}. ${r.titre}.`, label:r.titre, rub:r.id});
+    qs.forEach(q=>{ const rep=a.reponses[q.id];
+      out.push({text:q.t, label:r.titre, rub:r.id});
+      const ets=stepsOf(rep);
+      if(ets.length) ets.forEach((e,i)=>{
+        let t=`Étape ${i+1}. ${e.action}`; if(e.alerte) t+=` ${e.niveau==="absolu"?"Règle absolue":e.niveau==="attention"?"Attention":"Remarque"} : ${e.alerte}`;
+        out.push({text:t, label:`${r.titre} · étape ${i+1}`, key:`${q.id}:${i}`, rub:r.id}); });
+      else out.push({text:rep.texte, label:r.titre, key:`${q.id}:t`, rub:r.id}); }); });
+  return out;
+}
+function drawPlayer(){
+  const p=$("#player");
+  if(!TTS.q.length){ p.hidden=true; p.innerHTML=""; return; }
+  const it=TTS.q[TTS.i]||{};
+  p.hidden=false;
+  p.innerHTML=`<div class="in"><div class="now"><small>${esc(TTS.label||"")} · ${TTS.i+1} / ${TTS.q.length}</small><div>${esc(it.text||"")}</div></div>
+  <div class="ctl"><button class="icon-btn" data-act="p-prev" aria-label="Élément précédent">${I.prev}</button>
+  <button class="icon-btn main" data-act="p-toggle" aria-label="${TTS.playing?"Pause":"Reprendre"}">${TTS.playing?I.pause:I.play}</button>
+  <button class="icon-btn" data-act="p-next" aria-label="Élément suivant">${I.next}</button>
+  <button class="rate" data-act="p-rate" aria-label="Vitesse de lecture">×${TTS.rate}</button>
+  <button class="icon-btn" data-act="p-stop" aria-label="Arrêter la lecture">${I.stop}</button></div></div>`;
+}
+function markSpeaking(scroll){
+  document.querySelectorAll(".speaking").forEach(el=>el.classList.remove("speaking"));
+  const it=TTS.q.length && TTS.q[TTS.i]; if(!it || S.view!=="auto" || S.tab!=="lire") return;
+  const el = it.key ? document.querySelector(`[data-key="${it.key}"]`) : (it.rub ? document.getElementById("rub-"+it.rub) : null);
+  if(el){ if(it.key) el.classList.add("speaking"); if(scroll) el.scrollIntoView({block:"center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"}); }
+}
+
+/* ---------- Dictée ---------- */
+let REC=null;
+function stopRec(){ if(REC){ try{ REC.onend=null; REC.stop(); }catch(e){} REC=null; } }
+function startRec(tid="answer"){
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  const ta = $("#"+tid);
+  if(!SR){ toast("Touchez la zone de texte puis le micro du clavier pour dicter."); ta&&ta.focus(); return; }
+  if(REC){ stopRec(); render(); return; }
+  TTS.stop();
+  const put = v => { if(tid==="answer") setText(v); else S.imp.texte=v; };
+  const rec = new SR(); rec.lang="fr-FR"; rec.continuous=true; rec.interimResults=true;
+  const base = ta.value.trim() ? ta.value.trim()+(tid==="imptext"?"\n":" ") : ""; let fin="";
+  rec.onresult = e=>{
+    let interim="";
+    for(let i=e.resultIndex;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal) fin+=r[0].transcript.trim()+" "; else interim+=r[0].transcript; }
+    const box=$("#"+tid); if(!box) return;
+    if(tid==="answer" && /question suivante\s*$/i.test(fin.trim())){ fin=fin.trim().replace(/[,.]?\s*question suivante\s*$/i,""); box.value=(base+fin).trim(); put(box.value); stopRec(); nextQ(true); return; }
+    box.value = base+fin+interim; put(box.value);
+    if(tid==="answer"){ const pv=$("#preview"); if(pv) pv.innerHTML=previewHTML(curRep()); }
+  };
+  rec.onerror = e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed") toast("Micro non autorisé ici : touchez la zone de texte puis le micro du clavier."); else if(e.error!=="no-speech"&&e.error!=="aborted") toast("Dictée interrompue ("+e.error+")."); };
+  rec.onend = ()=>{ REC=null; render(); };
+  try{ rec.start(); REC=rec; render(); }catch(err){ REC=null; toast("Impossible de démarrer la dictée : utilisez le micro du clavier."); }
+}
+function voiceSearch(tid){
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  const box=$("#"+tid);
+  if(!SR){ toast("Touchez le champ de recherche puis le micro du clavier."); box&&box.focus(); return; }
+  stopRec(); TTS.stop();
+  const rec=new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
+  rec.onresult=e=>{ const v=e.results[0][0].transcript.trim().replace(/[.?!]$/,""); if(tid==="search") S.search=v; else if(tid==="qsearch") S.qsearch=v; else S.searchAll=v; render(); };
+  rec.onerror=e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed") toast("Micro non autorisé ici : touchez le champ puis le micro du clavier."); };
+  try{ rec.start(); toast("Dites le mot à rechercher…", 2500); }catch(err){ toast("Recherche vocale indisponible : utilisez le micro du clavier."); }
+}
+
+/* ---------- Import d'une procédure complète ---------- */
+function viewImport(a){
+  const R=S.imp.result, sr=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+  if(R){
+    const n=Object.keys(R).length;
+    return `<header class="top"><button class="btn ghost back" data-act="imp-back">${I.back}${esc(a.nom)}</button><span class="eyebrow">Import · vérification</span><h1>${n} question${n>1?"s":""} renseignée${n>1?"s":""}</h1>
+      <p class="muted">Relisez le découpage. Les questions absentes du texte restent inchangées.</p></header>
+      <div class="row"><button class="btn primary" data-act="imp-save">Enregistrer dans la procédure</button><button class="btn" data-act="imp-edit">Modifier le texte</button></div>
+      ${RUBRIQUES.map((r,ri)=>{ const qs=r.q.filter(q=>R[q.id]); if(!qs.length) return "";
+        return `<section class="rub"><div class="rub-head"><h2><span class="num">${String(ri+1).padStart(2,"0")}</span>${esc(r.titre)}</h2></div>
+        ${qs.map(q=>`<div class="q"><h3>${esc(q.t)}</h3>${hasContent(a,q.id)?`<p class="hint" style="margin:2px 0 0">Remplacera la réponse actuelle.</p>`:""}
+          <ol class="steps">${R[q.id].map(e=>`<li class="step"><div class="step-body"><div>${esc(e.action)}${e.bouton?` <span class="kbd">${esc(e.bouton)}</span>`:""}</div>${alertHTML(e)}</div></li>`).join("")}</ol></div>`).join("")}</section>`; }).join("")}
+      <div class="row" style="margin-top:20px"><button class="btn primary" data-act="imp-save">Enregistrer dans la procédure</button></div>`;
+  }
+  return `<header class="top"><button class="btn ghost back" data-act="imp-back">${I.back}${esc(a.nom)}</button><span class="eyebrow">Importer une procédure complète</span><h1>Tout dire d'un coup</h1>
+    <p class="muted">Collez, chargez ou dictez la procédure entière. L'appli la range dans les ${RUBRIQUES.length} rubriques et les ${ALLQ.length} questions du modèle, puis vous vérifiez avant d'enregistrer.</p></header>
+  <div class="wizard">
+    <div class="dictee"><button class="mic ${REC?"on":""}" data-act="mic-imp" aria-label="${REC?"Arrêter la dictée":"Dicter la procédure"}">${I.mic}</button>
+      <div class="hint">${REC?"<strong>Dictée en cours.</strong> Décrivez dans l'ordre : avant de démarrer, démarrage, calibration et contrôles, tests, arrêt.":(sr?"Touchez le micro et dictez la procédure dans l'ordre où vous la faites.":"Ici, la dictée passe par le clavier : touchez la zone de texte puis le micro du clavier Android.")}</div></div>
+    <label class="f">Procédure complète<textarea id="imptext" style="min-height:260px" placeholder="Ex. : Avant de démarrer, vérifier le flacon System Wash… Pour démarrer, aller sur l'écran État puis Initialisation BBD… Pour la calibration…">${esc(S.imp.texte)}</textarea></label>
+    <div class="row"><button class="btn primary" data-act="imp-run" ${S.imp.busy?"disabled":""}>${I.wand}${S.imp.busy?"Découpage en cours…":Store.sample?"Découper en rubriques avec Claude":"Découper en rubriques"}</button>
+      <label class="btn" for="impfile">Charger un fichier texte</label><input type="file" id="impfile" accept=".txt,text/plain" class="sr"></div>
+    ${audioBlock()}
+  </div>`;
+}
+function classerLocal(txt){
+  const out={}; let cur=null;
+  for(const st of decouperTexte(txt)){
+    const n=" "+norm(st.action)+" "; const sc={};
+    for(const q of ALLQ){ sc[q.id]=(KW[q.id]||[]).reduce((s,k)=>s+(n.includes(k)?1:0),0); }
+    const best=Object.keys(sc).sort((x,y)=>sc[y]-sc[x])[0];
+    if(sc[best]>0 && (!cur || sc[best]>sc[cur])) cur=best;
+    const qid=cur||"a3";
+    (out[qid]=out[qid]||[]).push(st);
+    if(st.niveau==="absolu" && qid!=="a1") (out.a1=out.a1||[]).push({...st, id:uid()});
+  }
+  return out;
+}
+async function runImport(){
+  const txt=(S.imp.texte||"").trim(); const a=current();
+  if(txt.length<10){ toast("Collez ou dictez d'abord la procédure."); return; }
+  stopRec();
+  if(Store.sample){
+    S.imp.busy=true; render();
+    try{
+      const r = await Store.sample.json(`Tu reçois la procédure complète d'un automate de laboratoire (« ${a.nom} »), écrite ou dictée par un technicien. Range son contenu dans les questions ci-dessous, sans rien inventer : chaque information va dans la question qui lui correspond le mieux ; une question sans information dans le texte est omise. Pour chaque question retenue, découpe en étapes courtes, dans l'ordre, une action par étape, verbe à l'infinitif ; corrige seulement les fautes évidentes de dictée. "bouton" = libellé exact du bouton, menu, onglet ou élément cité dans l'étape (sinon ""), "alerte" = la mise en garde associée (sinon ""), "niveau" = "absolu" pour une interdiction stricte, "attention" pour une précaution, "" sinon. Les interdictions strictes vont aussi dans a1.
+
+Questions (identifiant : [rubrique] question) :
+${ALLQ.map(q=>`${q.id} : [${q.rub.titre}] ${q.t}`).join("\n")}
+
+Procédure :
+"""
+${txt}
+"""
+
+Réponds uniquement en JSON : {"reponses":{"<identifiant>":{"etapes":[{"action":"","bouton":"","alerte":"","niveau":""}]}}}`, {modelTier:"default"});
+      const res={};
+      for(const [qid,v] of Object.entries((r&&r.reponses)||{})){
+        if(!ALLQ.some(q=>q.id===qid)) continue;
+        const et=(v&&Array.isArray(v.etapes)?v.etapes:[]).filter(e=>e&&e.action).map(e=>({id:uid(), action:String(e.action), bouton:String(e.bouton||""), alerte:String(e.alerte||""), niveau:["absolu","attention"].includes(e.niveau)?e.niveau:"", photo:"", box:null}));
+        if(et.length) res[qid]=et;
+      }
+      if(!Object.keys(res).length) throw new Error("vide");
+      S.imp.result=res; S.imp.busy=false; render(); window.scrollTo(0,0); return;
+    }catch(err){ S.imp.busy=false; toast(err&&err.code==="not_granted"?"Accès à Claude refusé : rangement par mots-clés utilisé.":"Claude n'a pas pu ranger le texte : rangement par mots-clés utilisé."); }
+  }
+  S.imp.result=classerLocal(txt); render(); window.scrollTo(0,0);
+}
+async function saveImport(){
+  const a=prepare(clone(current())); const R=S.imp.result; let n=0;
+  for(const [qid,et] of Object.entries(R)){
+    const old=(a.reponses[qid]&&a.reponses[qid].etapes)||[];
+    const keep=et.map(e=>{ const o=old.find(x=>x.photo&&x.bouton&&norm(x.bouton)===norm(e.bouton)); return o?{...e, photo:o.photo, box:o.box}:e; });
+    a.reponses[qid]={texte:keep.map(e=>e.action).join(" "), etapes:keep, na:false}; n++;
+  }
+  try{ await Store.save(a); S.imp={texte:"", result:null, busy:false}; go("auto",{tab:"lire", draft:null}); toast(`${n} question${n>1?"s":""} mise${n>1?"s":""} à jour.`); }
+  catch(e){ toast("Enregistrement impossible : vous n'avez peut-être pas le droit de modifier cette page."); }
+}
+
+
+/* ---------- Message vocal (WhatsApp ou autre) → texte ---------- */
+const ASR = { pipe:null, model:null,
+  async load(model, onProg){
+    if (this.pipe && this.model===model) return this.pipe;
+    const T = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/transformers.min.js");
+    T.env.allowLocalModels=false; T.env.useBrowserCache = (typeof caches!=="undefined");
+    this.pipe = await T.pipeline("automatic-speech-recognition", model, {progress_callback:onProg});
+    this.model=model; return this.pipe;
+  }
+};
+const inClaude = () => !!(window.claude && typeof window.claude.use==="function");
+function audioBlock(){
+  const au=S.imp.audio;
+  return `<section class="audio-imp"><h3>${I.mic} Joindre un message vocal</h3>
+    <p class="hint">Message vocal WhatsApp ou enregistrement du téléphone (.opus, .ogg, .m4a, .mp3, .wav). Dans WhatsApp : appui long sur le vocal → Partager → Enregistrer dans Fichiers, puis choisissez-le ici.</p>
+    ${inClaude()?`<p class="alert attention" style="margin:0"><b>Ici</b><span>Dans l'application ouverte depuis Claude, un fichier audio ne peut pas être transcrit. Utilisez le fichier HTML ou l'APK, ou copiez ici la transcription de WhatsApp (« Transcrire » sur le vocal).</span></p>`
+    :au&&au.busy?`<div class="row"><span class="spinner" aria-hidden="true"></span><span id="audiomsg">${esc(au.msg||"")}</span></div>`
+    :`<div class="row"><label class="btn primary" for="impaudio">${I.mic}Choisir le fichier audio</label><input type="file" id="impaudio" accept="audio/*,.opus,.ogg,.oga,.m4a,.mp3,.wav,.aac,.amr" class="sr">
+      <label class="row" style="gap:6px;font-size:.92rem">Qualité <select id="impprecis" style="width:auto;min-height:40px"><option value="0" ${S.imp.precis?"":"selected"}>Rapide (≈ 80 Mo)</option><option value="1" ${S.imp.precis?"selected":""}>Précise (≈ 250 Mo)</option></select></label></div>
+      <p class="hint" style="margin:0">La transcription se fait sur le téléphone. Le module de reconnaissance se télécharge une seule fois (Wi-Fi conseillé).</p>`}
+  </section>`;
+}
+function setAudioMsg(m){ if(S.imp.audio) S.imp.audio.msg=m; const el=$("#audiomsg"); if(el) el.textContent=m; }
+async function decodeAudio(file){
+  const buf=await file.arrayBuffer(); const AC=window.AudioContext||window.webkitAudioContext;
+  const ctx=new AC({sampleRate:16000});
+  try{ const ab=await ctx.decodeAudioData(buf); let d=ab.getChannelData(0);
+    if(ab.numberOfChannels>1){ const r=ab.getChannelData(1), m=new Float32Array(d.length); for(let i=0;i<d.length;i++) m[i]=(d[i]+r[i])/2; d=m; }
+    return {data:d, duration:ab.duration}; }
+  finally{ try{ ctx.close(); }catch(e){} }
+}
+async function transcribeAudio(file){
+  if(inClaude()){ toast("Ici, utilisez la transcription de WhatsApp ou la version HTML/APK."); return; }
+  stopRec(); TTS.stop();
+  S.imp.audio={busy:true, msg:"Lecture du fichier audio…"}; render();
+  try{
+    let dec; try{ dec=await decodeAudio(file); }catch(e){ throw new Error("ce format audio n'est pas lisible sur ce téléphone"); }
+    const model = S.imp.precis ? "Xenova/whisper-small" : "Xenova/whisper-base";
+    const files={};
+    setAudioMsg("Préparation du module de reconnaissance…");
+    let pipe;
+    try{ pipe=await ASR.load(model, p=>{ if(p && p.status==="progress" && p.file){ files[p.file]=[p.loaded||0, p.total||0]; let l=0,t=0; for(const [a,b] of Object.values(files)){ l+=a; t+=b; } setAudioMsg(`Téléchargement du module : ${t?Math.round(l/t*100):0} % (une seule fois)`); } }); }
+    catch(e){ throw new Error("le module de reconnaissance n'a pas pu se télécharger (vérifiez Internet)"); }
+    setAudioMsg(`Transcription de ${Math.max(1,Math.round(dec.duration))} s d'audio en cours… (environ ${Math.max(1,Math.round(dec.duration/ (S.imp.precis?15:40)))} min)`);
+    const out = await pipe(dec.data, {language:"french", task:"transcribe", chunk_length_s:30, stride_length_s:5});
+    const txt = (Array.isArray(out)?out.map(o=>o.text).join(" "):(out&&out.text)||"").replace(/\s+/g," ").trim();
+    if(!txt) throw new Error("aucune parole reconnue dans ce fichier");
+    S.imp.texte=(S.imp.texte?S.imp.texte.trim()+"\n":"")+txt; S.imp.audio=null; render();
+    toast("Message vocal transcrit. Relisez le texte, puis touchez « Découper en rubriques ».", 6000);
+  }catch(e){ S.imp.audio=null; render(); toast("Transcription impossible : "+((e&&e.message)||e)+".", 7000); }
+}
+
+/* ---------- Export Word (.docx) ---------- */
+const xe = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"");
+function wRun(t,o={}){ return `<w:r><w:rPr>${o.font?`<w:rFonts w:ascii="${o.font}" w:hAnsi="${o.font}"/>`:""}${o.b?"<w:b/>":""}${o.i?"<w:i/>":""}${o.color?`<w:color w:val="${o.color}"/>`:""}${o.sz?`<w:sz w:val="${o.sz}"/>`:""}${o.shd?`<w:shd w:val="clear" w:color="auto" w:fill="${o.shd}"/>`:""}</w:rPr><w:t xml:space="preserve">${xe(t)}</w:t></w:r>`; }
+function wPara(runs,o={}){ return `<w:p><w:pPr>${o.style?`<w:pStyle w:val="${o.style}"/>`:""}${o.keep?"<w:keepNext/>":""}${o.ind?`<w:ind w:left="${o.ind}" w:hanging="${o.hang||0}"/>`:""}${o.shd?`<w:shd w:val="clear" w:color="auto" w:fill="${o.shd}"/>`:""}${o.border?`<w:pBdr><w:left w:val="single" w:sz="18" w:space="6" w:color="${o.border}"/></w:pBdr>`:""}<w:spacing w:before="${o.before??0}" w:after="${o.after??100}"/></w:pPr>${runs}</w:p>`; }
+function wImage(n, cx, cy){ return `<w:p><w:pPr><w:ind w:left="567"/><w:spacing w:after="160"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Photo ${n}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="photo${n}.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`; }
+async function photoWithBox(e){
+  const u=await Store.photoURL(e.photo); if(!u) return null;
+  const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=u; });
+  const k=Math.min(1, 1200/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas"); c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
+  const g=c.getContext("2d"); g.drawImage(img,0,0,c.width,c.height);
+  if(e.box){ const b=e.box, x=b.x*c.width, y=b.y*c.height, w=b.w*c.width, h=b.h*c.height;
+    g.save(); g.fillStyle="rgba(8,20,26,.42)"; g.beginPath(); g.rect(0,0,c.width,c.height); g.rect(x,y,w,h); g.fill("evenodd"); g.restore();
+    g.lineWidth=Math.max(3,c.width/160); g.strokeStyle="#ffb000"; g.strokeRect(x,y,w,h);
+    if(e.bouton){ const fs=Math.max(14,Math.round(c.width/45)); g.font=`bold ${fs}px sans-serif`; const tw=g.measureText(e.bouton).width+fs*.8;
+      const ty=y-fs*1.5>0?y-fs*1.5:y+h; g.fillStyle="#ffb000"; g.fillRect(x,ty,tw,fs*1.5); g.fillStyle="#1d1400"; g.fillText(e.bouton,x+fs*.4,ty+fs*1.1); } }
+  const blob=await new Promise(res=>c.toBlob(res,"image/jpeg",.85));
+  return blob?{blob, w:c.width, h:c.height}:null;
+}
+async function exportWord(a, rubId, btn){
+  if(!window.JSZip){ toast("Le module Word n'a pas pu se charger. Vérifiez la connexion et réessayez."); return; }
+  const lbl=btn&&btn.lastChild, old=lbl&&lbl.textContent; if(btn){ btn.disabled=true; if(lbl) lbl.textContent=" Préparation…"; }
+  try{
+    const zip=new JSZip(); const body=[]; const rels=[]; let n=0;
+    const rubs=RUBRIQUES.map((r,ri)=>({r,ri})).filter(x=>!rubId||x.r.id===rubId);
+    const sousTitre=[a.fabricant,a.modele].filter(Boolean).join(" · ");
+    body.push(wPara(wRun(rubId?`${a.nom} — ${rubs[0].r.titre}`:`Procédure d'utilisation — ${a.nom}`),{style:"Title",after:80}));
+    if(sousTitre) body.push(wPara(wRun(sousTitre,{color:"566A71"}),{after:60}));
+    const info=FICHE.slice(3).filter(([k])=>a[k]).map(([k,l])=>`${l} : ${a[k]}`);
+    info.push(`Édité le ${new Date().toLocaleDateString("fr-FR")}`);
+    body.push(wPara(wRun(info.join("   ·   "),{sz:18,color:"566A71"}),{after:240}));
+    if(!rubId){
+      const abs=ALLQ.flatMap(q=>hasContent(a,q.id)?stepsOf(a.reponses[q.id]).filter(e=>e.niveau==="absolu"):[]);
+      if(abs.length){ body.push(wPara(wRun("RÈGLES ABSOLUES",{b:true,color:"B42318"}),{shd:"FDECEA",border:"B42318",before:120,after:60,keep:true}));
+        abs.forEach(e=>body.push(wPara(wRun("• "+e.action,{b:true})+(e.alerte?wRun("  "+e.alerte,{color:"566A71"}):""),{shd:"FDECEA",border:"B42318",after:40}))); body.push(wPara("",{after:120})); }
+    }
+    for(const {r,ri} of rubs){
+      body.push(wPara(wRun(`${ri+1}. ${r.titre}`),{style:"Heading1",keep:true}));
+      if(r.q.every(q=>isNA(a,q.id))){ body.push(wPara(wRun("Sans objet pour cet automate.",{i:true,color:"566A71"}))); continue; }
+      for(const q of r.q){
+        if(isNA(a,q.id)) continue;
+        body.push(wPara(wRun(q.t),{style:"Heading2",keep:true}));
+        if(!hasContent(a,q.id)){ body.push(wPara(wRun("À compléter.",{i:true,color:"566A71"}))); continue; }
+        const rep=a.reponses[q.id]; const et=stepsOf(rep);
+        if(!et.length){ body.push(wPara(wRun(rep.texte))); continue; }
+        for(let i=0;i<et.length;i++){ const e=et[i];
+          body.push(wPara(wRun(`${i+1}.\t`,{b:true,color:"0D6B7A"})+wRun(e.action)+(e.bouton?wRun("  ")+wRun(` ${e.bouton} `,{font:"Consolas",b:true,sz:19,shd:"E3E9EB"}):""),{ind:567,hang:567,after:60}));
+          if(e.alerte||e.niveau){ const lv=e.niveau==="absolu"?["B42318","FDECEA","RÈGLE ABSOLUE"]:e.niveau==="attention"?["9A5B00","FFF2D6","ATTENTION"]:["566A71","E8EEF0","REMARQUE"];
+            body.push(wPara(wRun(lv[2]+(e.alerte?" : ":""),{b:true,color:lv[0],sz:20})+(e.alerte?wRun(e.alerte,{sz:20}):""),{ind:567,shd:lv[1],border:lv[0],after:80})); }
+          if(e.photo){ try{ const ph=await photoWithBox(e); if(ph){ n++; zip.file(`word/media/photo${n}.jpeg`, ph.blob);
+            rels.push(`<Relationship Id="rImg${n}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/photo${n}.jpeg"/>`);
+            const cx=3600000, cy=Math.round(cx*ph.h/ph.w); body.push(wImage(n, cx, Math.min(cy, 5400000))); } }catch(err){} }
+        }
+      }
+    }
+    zip.file("[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+    zip.file("_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+    zip.file("word/_rels/document.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${rels.join("")}</Relationships>`);
+    zip.file("word/styles.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="100" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:color w:val="10232B"/><w:sz w:val="40"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:pBdr><w:bottom w:val="single" w:sz="12" w:space="2" w:color="10232B"/></w:pBdr><w:spacing w:before="360" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="0D6B7A"/><w:sz w:val="30"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:color w:val="10232B"/><w:sz w:val="24"/></w:rPr></w:style></w:styles>`);
+    zip.file("word/document.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>${body.join("")}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`);
+    const blob=await zip.generateAsync({type:"blob", mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+    const base=`Procedure_${a.nom}${rubId?"_"+rubs[0].r.titre:""}`.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w-]+/g,"_").replace(/_+/g,"_");
+    await saveFile(base+".docx", blob);
+  }catch(err){ toast("Le fichier Word n'a pas pu être créé."); }
+  finally{ if(btn){ btn.disabled=false; if(lbl) lbl.textContent=old; } }
+}
+async function saveFile(filename, blob){
+  if(Store.downloads){ try{ await Store.downloads.save({filename, data:blob}); }catch(e){ if(e&&e.code!=="declined"&&e.code!=="cancelled") toast("Téléchargement annulé."); } return; }
+  if(!window.claude){ const u=URL.createObjectURL(blob); const l=document.createElement("a"); l.href=u; l.download=filename; document.body.appendChild(l); l.click(); l.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000); return; }
+  toast("Le téléchargement n'est pas disponible ici.");
+}
+
+/* ---------- Saisie : texte → étapes ---------- */
+function curRep(){ const q=ALLQ[S.qi]; const d=S.draft; d.reponses[q.id]=d.reponses[q.id]||{texte:"",etapes:[]}; (S.touched=S.touched||new Set()).add(q.id); return d.reponses[q.id]; }
+function setText(v){ curRep().texte=v; }
+function extraireBouton(s){
+  const m = s.match(/[«"“]\s*([^»"”]{1,45}?)\s*[»"”]/); if(m) return m[1].trim();
+  const v = s.match(/(?:cliqu(?:er|ez)\s+sur|appuy(?:er|ez)\s+sur|touch(?:er|ez)(?:\s+sur)?|sélectionn(?:er|ez)|ouvr(?:ir|ez)|all(?:er|ez)\s+(?:dans|sur)|rendez-vous\s+dans|menu|onglet|bouton|section)\s+(?:le |la |l'|les |du |de la |sur )?(?:menu |onglet |bouton |écran |section )?([A-ZÉÈÀÂ][\wÀ-ÿ'’ -]{1,45}?)(?=[,.;:!?]|\s+(?:puis|et|pour|en|qui|jusqu|afin|dans)\b|$)/);
+  return v ? v[1].trim() : "";
+}
+
+function decouperLocal(t){
+  const parts = t.split(/\s*(?:\n+|[,.]?\s*étape suivante\s*[.,]?|(?<=[.;!?])\s+|,?\s+(?:ensuite|puis|après ça)\s*,?\s+)/i)
+    .map(s=>s.trim().replace(/^[-•\d.)\s]+/,"").replace(/\s*[.;]$/,"")).filter(s=>s.length>2);
+  const out=[];
+  for(const s of parts){
+    const a=s.match(/^(attention|vérification|important|remarque|note|nb)\s*:\s*(.+)$/i);
+    if(a && out.length){ const prev=out[out.length-1]; prev.alerte=(prev.alerte?prev.alerte+" ":"")+cap(a[2])+"."; if(!/^(remarque|note|nb)$/i.test(a[1]) && prev.niveau!=="absolu") prev.niveau="attention"; continue; }
+    const abs=/\b(jamais|interdit|ne pas|surtout pas)\b/i.test(s), att=/\b(attention|vérifier que|bien vérifier)\b/i.test(s);
+    out.push({id:uid(), action:cap(s)+".", bouton:extraireBouton(s), alerte:"", niveau:abs?"absolu":att?"attention":"", photo:"", box:null});
+  }
+  return out;
+}
+
+async function splitSteps(btn){
+  const rep=curRep(), q=ALLQ[S.qi];
+  if(!(rep.texte||"").trim()){ toast("Dictez ou écrivez d'abord la réponse."); return; }
+  btn.disabled=true; if(btn.lastChild) btn.lastChild.textContent=Store.sample?" Claude prépare les étapes…":" Découpage…";
+  const n=await autoSplit(rep, q, S.draft.nom);
+  render(); toast(`${n} étape${n>1?"s":""} créée${n>1?"s":""}. Relisez-les avant d'enregistrer.`);
+}
+function nextQ(voix){ saveDraft(false).then(()=>{ if(S.qi<ALLQ.length-1){ S.qi++; render(); window.scrollTo(0,0); TTS.say(ALLQ[S.qi].t, voix?()=>{ if(S.view==="auto"&&S.tab==="saisir"&&!REC) startRec(); }:null); } else { S.tab="lire"; render(); window.scrollTo(0,0); toast("Procédure enregistrée."); } }); }
+async function saveDraft(notify=true){
+  /* N'écrit que les questions modifiées ici, par-dessus la version la plus récente (évite d'écraser le travail d'un collègue) */
+  const aSplit=[...(S.touched||[])].filter(qid=>needsSplit(S.draft.reponses[qid]));
+  if(aSplit.length){ if(notify!=="silent") toast("Mise en étapes automatique…", 2500); for(const qid of aSplit) await autoSplit(S.draft.reponses[qid], QI[qid], S.draft.nom); }
+  const latest = Store.get(S.draft.id); const merged = latest ? prepare(clone(latest)) : S.draft;
+  for(const qid of (S.touched||[])) if(S.draft.reponses[qid]) merged.reponses[qid]=clone(S.draft.reponses[qid]);
+  try{ await Store.save(merged); S.touched=new Set(); S.draft=prepare(clone(merged)); if(notify) toast("Enregistré."); }
+  catch(err){ toast("Enregistrement impossible : "+(err&&err.code==="invalid_argument"?"vous n'avez pas le droit de modifier cette page.":(err&&err.message)||"réessayez.")); throw err; }
+}
+
+/* ---------- Photo d'une étape et mise en évidence ---------- */
+const P = { i:null, blob:null, url:"", box:null, ref:"", busy:false, bouton:"" };
+async function openPhoto(i){
+  const e=curRep().etapes[i]; P.i=i; P.blob=null; P.box=e.box?{...e.box}:null; P.ref=e.photo||""; P.bouton=e.bouton||""; P.url=e.photo?await Store.photoURL(e.photo):""; P.busy=false;
+  drawSheet(); $("#sheet").hidden=false; document.body.style.overflow="hidden";
+}
+function closeSheet(){ $("#sheet").hidden=true; document.body.style.overflow=""; if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.i=null; render(); }
+function drawSheet(){
+  const e=curRep().etapes[P.i]; const b=P.box;
+  const canDetect = Store.sample && Store.images;
+  $("#sheet").innerHTML = `<div class="wrap" style="display:grid;gap:14px">
+    <div class="row" style="justify-content:space-between"><button class="btn ghost back" data-act="sh-close">${I.back}Retour</button><span class="eyebrow">Étape ${P.i+1}</span></div>
+    <h2>${esc(e.action||"Étape sans texte")}</h2>
+    <label class="f">Bouton ou menu à mettre en évidence<input type="text" id="sh-bouton" value="${esc(P.bouton)}" placeholder="Libellé exact à l'écran"></label>
+    <input type="file" id="sh-file" accept="image/*" capture="environment" class="sr">
+    ${P.url?`<div class="stage" id="stage"><img src="${esc(P.url)}" alt="Photo de l'étape">${b?`<div class="hl" style="left:${b.x*100}%;top:${b.y*100}%;width:${b.w*100}%;height:${b.h*100}%"></div>`:""}</div>
+      <p class="hint">Faites glisser le doigt sur la photo pour encadrer le bouton ou le menu.${canDetect?" Ou laissez Claude le repérer.":""}</p>
+      <div class="row">${canDetect?`<button class="btn primary" data-act="sh-detect" ${P.busy?"disabled":""}>${I.target}${P.busy?"Recherche du bouton…":"Repérer le bouton"}</button>`:""}
+      ${b?`<button class="btn" data-act="sh-clear">Effacer le cadre</button>`:""}<button class="btn" data-act="sh-pick">${I.cam}Changer de photo</button><button class="btn danger" data-act="sh-remove">Retirer la photo</button></div>`
+    :`<label class="pick" for="sh-file">${I.cam}<strong>Prendre ou choisir une photo</strong><span class="hint">Photographiez l'écran ou la partie de l'automate concernée par cette étape.</span></label>`}
+    <div class="row"><button class="btn primary" data-act="sh-done" ${P.busy?"disabled":""}>Valider</button><button class="btn" data-act="sh-close">Annuler</button></div>
+  </div>`;
+  const st=$("#stage"); if(st) bindStage(st);
+}
+function bindStage(st){
+  let o=null, el=null;
+  const pos = ev=>{ const r=st.getBoundingClientRect(); return {x:clamp((ev.clientX-r.left)/r.width), y:clamp((ev.clientY-r.top)/r.height)}; };
+  st.addEventListener("pointerdown", ev=>{ o=pos(ev); st.setPointerCapture(ev.pointerId); st.querySelector(".hl")?.remove(); el=document.createElement("div"); el.className="hl"; st.appendChild(el); });
+  st.addEventListener("pointermove", ev=>{ if(!o) return; const p=pos(ev); const b={x:Math.min(o.x,p.x), y:Math.min(o.y,p.y), w:Math.abs(p.x-o.x), h:Math.abs(p.y-o.y)}; Object.assign(el.style,{left:b.x*100+"%",top:b.y*100+"%",width:b.w*100+"%",height:b.h*100+"%"}); P._b=b; });
+  st.addEventListener("pointerup", ()=>{ if(!o) return; o=null; if(P._b && P._b.w>.02 && P._b.h>.02){ P.box=P._b; } P._b=null; drawSheet(); });
+}
+async function detectBox(){
+  const e=curRep().etapes[P.i]; const label=P.bouton.trim();
+  if(!label){ toast("Indiquez d'abord le nom du bouton ou du menu à repérer."); return; }
+  P.busy=true; drawSheet();
+  try{
+    const blob = P.blob || await Store.photoBlob(P.ref);
+    if(!blob) throw new Error("photo");
+    const r = await Store.sample.json(`Photo prise par un technicien de laboratoire : écran du logiciel ou face de l'automate « ${S.draft.nom} ». Étape de la procédure : « ${e.action} ». Repère sur la photo l'élément (bouton, menu, onglet, champ, interrupteur, couvercle) nommé « ${label} ». Donne un cadre serré autour de cet élément, en fractions de la largeur et de la hauteur de l'image (x et y = coin haut gauche, 0 = bord gauche ou haut, 1 = bord droit ou bas). S'il n'est pas visible, trouve = false. Réponds uniquement en JSON : {"trouve":true,"x":0,"y":0,"w":0,"h":0}`, {images:[blob], modelTier:"default"});
+    if(r && r.trouve){ const b={x:clamp(r.x), y:clamp(r.y), w:clamp(r.w), h:clamp(r.h)}; b.w=Math.min(b.w,1-b.x); b.h=Math.min(b.h,1-b.y);
+      if(b.w>.005&&b.h>.005){ P.box=b; toast("Bouton repéré. Ajustez le cadre au doigt si besoin."); } else toast("Cadre trop petit : encadrez le bouton au doigt."); }
+    else toast(`« ${label} » n'a pas été trouvé sur la photo : encadrez-le au doigt.`);
+  }catch(err){ toast(err&&err.code==="not_granted"?"Accès à Claude refusé : encadrez le bouton au doigt.":"Repérage impossible : encadrez le bouton au doigt."); }
+  P.busy=false; drawSheet();
+}
+async function finishPhoto(){
+  const e=curRep().etapes[P.i]; e.bouton=P.bouton.trim();
+  if(P.blob){ P.busy=true; drawSheet();
+    try{ e.photo = await Store.putPhoto(P.blob); }catch(err){ P.busy=false; drawSheet(); toast("Photo non enregistrée : "+((err&&err.message)||"réessayez.")); return; } }
+  else e.photo=P.ref;
+  e.box = e.photo ? P.box : null;
+  P.blob=null; await saveDraft(false).catch(()=>{}); $("#sheet").hidden=true; document.body.style.overflow=""; P.i=null; render();
+}
+
+function leaveSaisir(){ return (S.view==="auto" && S.tab==="saisir" && S.draft) ? saveDraft(false).catch(()=>{}) : Promise.resolve(); }
+/* ---------- Détection automatique des étapes dans un texte saisi ---------- */
+const lowerFirst = s => s && !/^[A-ZÀ-Ý]{2}/.test(s) ? s.charAt(0).toLowerCase()+s.slice(1) : s;
+function decouperTexte(t){
+  const lines = String(t||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const marker = l => /^(\d{1,2}[.)]?|étape\s*\d+\s*[:.)\-–]?|[•\-*–])$/i.test(l);
+  const inlineNum = l => /^(?:\d{1,2}|étape\s*\d+)\s*[:.)\-–]\s+\S/i.test(l);
+  const bullet = l => /^[•\-*–]\s+\S/.test(l);
+  if (!(lines.length>1 && lines.some(l=>marker(l)||inlineNum(l)||bullet(l)))) return decouperLocal(t);
+  const blocks=[]; let b=null; let bulletNext=false;
+  const nb=()=>{ b={titre:"", items:[]}; blocks.push(b); };
+  for (const l of lines){
+    let txt=l, isBullet=false, m;
+    if (/^\d{1,2}[.)]?$/.test(l)){ nb(); bulletNext=false; continue; }
+    if (/^étape\s*\d+\s*[:.)\-–]?$/i.test(l)){ if(!b || b.items.length) nb(); bulletNext=false; continue; }
+    if (/^[•\-*–]$/.test(l)){ bulletNext=true; continue; }
+    if ((m=l.match(/^(?:étape\s*\d+|\d{1,2})\s*[:.)\-–]\s*(.+)$/i))){ nb(); txt=m[1]; }
+    else if (bullet(l)){ txt=l.replace(/^[•\-*–]\s+/,""); isBullet=true; }
+    if (bulletNext){ isBullet=true; bulletNext=false; }
+    if (!b) nb();
+    if (!b.titre && !b.items.length && !isBullet && txt.length<70 && !/[.!?;]$/.test(txt)){ b.titre=txt; continue; }
+    b.items.push(txt);
+  }
+  const out=[];
+  for (const k of blocks){
+    if (!k.titre && !k.items.length) continue;
+    const instr=[], alerts=[]; let niv="";
+    for (const it of k.items){
+      const a = it.match(/^(vérification|vérifier|attention|important|remarque|note|nb)\s*:\s*(.+)$/i);
+      if (a){ alerts.push(cap(a[2].trim())); if(!/^(remarque|note|nb)$/i.test(a[1])) niv="attention"; }
+      else instr.push(it);
+    }
+    let action = instr.join(" ").trim();
+    if (k.titre) action = action ? `${k.titre.replace(/[.:]$/,"")} : ${lowerFirst(action)}` : k.titre;
+    if (!action && alerts.length) action = alerts.shift();
+    if (!/[.!?]$/.test(action)) action += ".";
+    if (/\b(jamais|interdit)\b/.test(norm(action+" "+alerts.join(" ")))) niv="absolu";
+    out.push({id:uid(), action:cap(action), bouton:extraireBouton(instr.join(" ")||action), alerte:alerts.join(" "), niveau:niv, photo:"", box:null});
+  }
+  return out.length ? out : decouperLocal(t);
+}
+/* Étapes à afficher : celles enregistrées, sinon celles détectées dans le texte */
+const _stepCache = new Map();
+function stepsOf(rep){
+  if (!rep) return [];
+  const et=(rep.etapes||[]).filter(e=>e.action);
+  if (et.length) return et;
+  const t=(rep.texte||"").trim(); if(!t) return [];
+  if (!_stepCache.has(t)) _stepCache.set(t, decouperTexte(t));
+  return _stepCache.get(t);
+}
+/* Faut-il (re)découper cette réponse à l'enregistrement ? */
+function needsSplit(rep){
+  if (!rep || rep.na || !(rep.texte||"").trim()) return false;
+  const has=(rep.etapes||[]).some(e=>e.action);
+  return !has || (rep.splitFrom!==undefined && rep.splitFrom!==rep.texte);
+}
+async function autoSplit(rep, q, nom){
+  const anciennes=rep.etapes||[];
+  const garder = list => list.map(e=>{ const o=anciennes.find(x=>x.photo && x.bouton && norm(x.bouton)===norm(e.bouton)); return o?{...e, photo:o.photo, box:o.box}:e; });
+  let et=null;
+  if (Store.sample){
+    try{
+      const r = await Store.sample.json(promptEtapes(nom, q.t, rep.texte), {modelTier:"quick"});
+      et=(r&&Array.isArray(r.etapes)?r.etapes:[]).filter(e=>e&&e.action).map(e=>({id:uid(), action:String(e.action), bouton:String(e.bouton||""), alerte:String(e.alerte||""), niveau:["absolu","attention"].includes(e.niveau)?e.niveau:"", photo:"", box:null}));
+      if(!et.length) et=null;
+    }catch(e){ et=null; }
+  }
+  if (!et) et=decouperTexte(rep.texte);
+  rep.etapes=garder(et); rep.splitFrom=rep.texte;
+  return rep.etapes.length;
+}
+function promptEtapes(nom, question, txt){
+  return `Tu aides un technicien de laboratoire à rédiger la procédure de l'automate « ${nom} ». Question de la procédure : « ${question} ». Texte saisi ou dicté par le technicien (il peut être copié d'un document, avec des numéros, des titres, des puces, ou contenir des erreurs de dictée et les mots « étape suivante ») : « ${txt} ». Découpe ce texte en étapes, dans l'ordre, sans rien inventer ni ajouter. Une étape = une action concrète, verbe à l'infinitif ; si le texte donne un titre d'étape, commence l'action par ce titre suivi de « : ». Corrige seulement les fautes évidentes. Pour chaque étape : "bouton" = libellé exact du bouton, menu, onglet ou élément cité (chaîne vide si aucun) ; "alerte" = la vérification ou mise en garde associée à cette étape (chaîne vide sinon) ; "niveau" = "absolu" pour une interdiction stricte, "attention" pour une vérification ou une précaution, "" sinon. Réponds uniquement en JSON : {"etapes":[{"action":"","bouton":"","alerte":"","niveau":""}]}`;
+}
+function previewHTML(rep){
+  if (!rep || rep.na || !(rep.texte||"").trim() || !needsSplit(rep)) return "";
+  const et=decouperTexte(rep.texte);
+  if (!et.length) return "";
+  return `<div class="preview"><div class="row" style="justify-content:space-between"><span class="eyebrow">Aperçu : ${et.length} étape${et.length>1?"s":""} détectée${et.length>1?"s":""}</span><span class="hint">${Store.sample?"Claude affinera à l'enregistrement":"Appliqué à l'enregistrement"}</span></div>
+    <ol class="steps">${et.map(e=>`<li class="step"><div class="step-body"><div>${fmtAction(e.action)}${e.bouton?` <span class="kbd">${esc(e.bouton)}</span>`:""}</div>${alertHTML(e)}</div></li>`).join("")}</ol></div>`;
+}
+/* Titre d'étape (avant « : ») en gras, comme dans les procédures existantes */
+function fmtAction(a, ts){
+  const m=String(a).match(/^([^:]{3,60}?)\s:\s(.+)$/s);
+  return m ? `<strong>${hi(m[1],ts)}</strong> : ${hi(m[2],ts)}` : hi(a,ts);
+}
+
+/* ---------- Événements ---------- */
+document.addEventListener("click", async ev=>{
+  const t=ev.target.closest("[data-act]"); if(!t) return;
+  const act=t.dataset.act; const a=current();
+  switch(act){
+    case "new": go("new",{importAfter:false}); break;
+    case "create": createAuto(); break;
+    case "goq": { stopRec(); await saveDraft(false).catch(()=>{}); S.qi=+t.dataset.i; S.qsearch=""; render(); window.scrollTo(0,0); break; }
+    case "save-fiche": saveFiche(); break;
+    case "new-import": go("new",{importAfter:true}); break;
+    case "go-import": stopRec(); await leaveSaisir(); S.imp={texte:"", result:null, busy:false}; go("import"); break;
+    case "imp-back": stopRec(); go("auto",{tab:"lire", draft:null}); break;
+    case "mic-imp": startRec("imptext"); break;
+    case "imp-run": runImport(); break;
+    case "imp-edit": S.imp.result=null; render(); break;
+    case "imp-save": saveImport(); break;
+    case "voice-search": voiceSearch(t.dataset.target); break;
+    case "clear-search": S.search=""; render(); break;
+    case "open-search": go("auto",{autoId:t.dataset.id, tab:"lire", draft:null, search:S.searchAll}); break;
+    case "listen-found": { const ts=terms(S.search); const ids=ALLQ.filter(q=>hasContent(a,q.id)&&matchQ(a,q,ts)).map(q=>q.id); TTS.start(itemsFor(a,null,ids), "Recherche « "+S.search+" »"); break; }
+    case "set-na": { const x=prepare(clone(a)); x.reponses[t.dataset.q]={texte:"", etapes:[], na:true}; try{ await Store.save(x); render(); toast("Question marquée sans objet."); }catch(e){ toast("Enregistrement impossible."); } break; }
+    case "word-all": exportWord(a, null, t); break;
+    case "word-rub": exportWord(a, t.dataset.rub, t); break;
+    case "home": TTS.stop(); await leaveSaisir(); go("list",{autoId:null, draft:null, confirmDel:false}); break;
+    case "open": go("auto",{autoId:t.dataset.id, tab:"lire", draft:null, qi:0, confirmDel:false, search:""}); break;
+    case "listen-all": { ev.stopPropagation(); const x=Store.get(t.dataset.id); if(x){ if(S.view==="list") go("auto",{autoId:x.id, tab:"lire", draft:null}); TTS.start(itemsFor(x), x.nom); } break; }
+    case "listen-rub": { const r=RUBRIQUES.find(r=>r.id===t.dataset.rub); TTS.start(itemsFor(a,[r.id]), r.titre); break; }
+    case "jump": document.getElementById("rub-"+t.dataset.rub)?.scrollIntoView({block:"start"}); break;
+    case "tab": if(S.tab==="saisir" && t.dataset.tab!=="saisir"){ stopRec(); await leaveSaisir(); } S.tab=t.dataset.tab; S.confirmDel=false; if(S.tab!=="saisir") S.draft=null; render(); break;
+    case "answer": S.tab="saisir"; S.draft=null; S.qi=ALLQ.findIndex(q=>q.id===t.dataset.q); render(); window.scrollTo(0,0); break;
+    case "say-q": TTS.say(ALLQ[S.qi].t); break;
+    case "mic": startRec(); break;
+    case "split": stopRec(); splitSteps(t); break;
+    case "add-step": curRep().etapes.push({id:uid(), action:"", bouton:"", alerte:"", niveau:"", photo:"", box:null}); render(); break;
+    case "st-up": case "st-down": case "st-del": { const et=curRep().etapes, i=+t.dataset.i;
+      if(act==="st-del") et.splice(i,1); else { const j=act==="st-up"?i-1:i+1; [et[i],et[j]]=[et[j],et[i]]; } render(); break; }
+    case "photo": stopRec(); openPhoto(+t.dataset.i); break;
+    case "prevq": stopRec(); saveDraft(false).then(()=>{ S.qi--; render(); window.scrollTo(0,0); }).catch(()=>{}); break;
+    case "nextq": stopRec(); nextQ(); break;
+    case "save": saveDraft(true).then(()=>render()).catch(()=>{}); break;
+    case "copy": { const txt=procedureText(a); try{ await navigator.clipboard.writeText(txt); toast("Procédure copiée."); }catch(e){ toast("Copie refusée par l'appareil."); } break; }
+    case "dl-txt": case "dl-json": { try{ const json=act==="dl-json"; await Store.downloads.save({filename:`${(a.nom||"automate").replace(/[^\wÀ-ÿ-]+/g,"_")}.${json?"json":"txt"}`, data: json?JSON.stringify(a,null,2):procedureText(a)}); }catch(e){ toast("Téléchargement annulé."); } break; }
+    case "del": S.confirmDel=true; render(); break;
+    case "del-no": S.confirmDel=false; render(); break;
+    case "del-yes": try{ TTS.stop(); await Store.remove(a.id); go("list",{autoId:null, confirmDel:false}); toast("Automate supprimé."); }catch(e){ toast("Suppression impossible."); } break;
+    case "p-toggle": TTS.toggle(); break;
+    case "p-prev": TTS.move(-1); break;
+    case "p-next": TTS.move(1); break;
+    case "p-stop": TTS.stop(); break;
+    case "p-rate": { const r=[0.8,1,1.2]; TTS.rate=r[(r.indexOf(TTS.rate)+1)%r.length]; drawPlayer(); if(TTS.playing) TTS.speak(); break; }
+    case "sh-close": closeSheet(); break;
+    case "sh-pick": $("#sh-file").click(); break;
+    case "sh-clear": P.box=null; drawSheet(); break;
+    case "sh-remove": if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=null; P.url=""; P.ref=""; P.box=null; drawSheet(); break;
+    case "sh-detect": detectBox(); break;
+    case "sh-done": finishPhoto(); break;
+  }
+});
+document.addEventListener("keydown", ev=>{ if(ev.key==="Enter" && ev.target.matches("#newform input")){ ev.preventDefault(); createAuto(); return; } if(ev.key==="Enter" && ev.target.matches("#ficheform input")){ ev.preventDefault(); saveFiche(); return; } if((ev.key==="Enter"||ev.key===" ") && ev.target.matches('.card[data-act="open"]')){ ev.preventDefault(); ev.target.click(); } });
+document.addEventListener("input", ev=>{
+  const t=ev.target;
+  if(t.id==="answer"){ setText(t.value); clearTimeout(window._pv); window._pv=setTimeout(()=>{ const pv=$("#preview"); if(pv) pv.innerHTML=previewHTML(curRep()); },500); return; }
+  if(t.id==="sh-bouton"){ P.bouton=t.value; return; }
+  if(t.id==="imptext"){ S.imp.texte=t.value; return; }
+  if(t.id==="search"){ S.search=t.value; render(); return; }
+  if(t.id==="searchall"){ S.searchAll=t.value; render(); return; }
+  if(t.id==="qsearch"){ S.qsearch=t.value; const box=$("#qresults"); if(box&&S.draft) box.innerHTML=qResults(S.draft); return; }
+  if(t.dataset.st!=null){ const r=curRep(); const e=r.etapes[+t.dataset.st]; if(e){ e[t.dataset.k]=t.value; r.splitFrom=r.texte; } }
+});
+document.addEventListener("change", async ev=>{
+  const t=ev.target;
+  if(t.id==="qpick"){ stopRec(); await saveDraft(false).catch(()=>{}); S.qi=+t.value; render(); return; }
+  if(t.id==="na"){ curRep().na=t.checked; if(t.checked) stopRec(); render(); return; }
+  if(t.id==="impaudio" && t.files && t.files[0]){ transcribeAudio(t.files[0]); return; }
+  if(t.id==="impprecis"){ S.imp.precis=t.value==="1"; return; }
+  if(t.id==="impfile" && t.files && t.files[0]){ try{ S.imp.texte=(S.imp.texte?S.imp.texte+"\n":"")+await t.files[0].text(); render(); }catch(e){ toast("Ce fichier ne peut pas être lu."); } return; }
+  if(t.dataset.st!=null && t.dataset.k==="niveau"){ const e=curRep().etapes[+t.dataset.st]; if(e) e.niveau=t.value; }
+  if(t.id==="sh-file" && t.files && t.files[0]){
+    try{ const b=await compress(t.files[0]); if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=b; P.url=URL.createObjectURL(b); P.box=null; drawSheet(); }
+    catch(e){ toast("Cette image ne peut pas être lue."); }
+  }
+});
+function ficheValues(f){ const vals={}; f.querySelectorAll("[data-fiche]").forEach(i=>vals[i.dataset.fiche]=i.value.trim()); return vals; }
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej({code:"timeout", message:"pas de réponse du serveur"}), ms))]);
+function errMsg(e){ if(!e) return "erreur inconnue"; if(e.code==="invalid_argument") return "vous n'avez pas le droit de modifier cette page (demandez l'accès Contributeur)"; if(e.code==="quota_exceeded") return "espace de stockage plein"; if(e.code==="timeout"||e.code==="unavailable") return "connexion lente ou coupée, réessayez"; return e.message||e.code||String(e); }
+let creating=false;
+async function createAuto(){
+  if(creating) return;
+  const f=$("#newform"); if(!f) return;
+  const vals=ficheValues(f);
+  if(!vals.nom){ toast("Écrivez d'abord le nom de l'automate."); $("#f-nom")?.focus(); return; }
+  const btn=$("#createbtn"); creating=true; if(btn){ btn.disabled=true; btn.textContent="Création…"; }
+  try{
+    const base=(norm(vals.nom).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"automate").slice(0,40);
+    const id = Store.get(base) ? base+"-"+uid().slice(0,4) : base;
+    const a={id, ...vals, reponses:{}};
+    await withTimeout(Store.save(a), 12000);
+    creating=false;
+    if(S.importAfter){ S.imp={texte:"", result:null, busy:false}; go("import",{autoId:id, importAfter:false}); }
+    else { go("auto",{autoId:id, tab:"saisir", draft:null, qi:0}); try{ TTS.say(ALLQ[0].t); }catch(e){} }
+    toast(`« ${vals.nom} » créé.`);
+  }catch(e){
+    creating=false; if(btn){ btn.disabled=false; btn.textContent=S.importAfter?"Créer et importer la procédure":"Créer et répondre aux questions"; }
+    toast("Création impossible : "+errMsg(e)+".", 6000);
+  }
+}
+async function saveFiche(){
+  const f=$("#ficheform"); if(!f) return; const vals=ficheValues(f);
+  if(!vals.nom){ toast("Le nom de l'automate est obligatoire."); return; }
+  try{ await withTimeout(Store.save({...clone(current()), ...vals}), 12000); toast("Fiche enregistrée."); render(); }catch(e){ toast("Enregistrement impossible : "+errMsg(e)+".", 6000); }
+}
+document.addEventListener("submit", ev=>{ ev.preventDefault(); if(ev.target.id==="newform") createAuto(); else if(ev.target.id==="ficheform") saveFiche(); });
+window.addEventListener("beforeunload", ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
+
+TTS.init();
+Store.init().catch(()=>{ Store.loaded=true; render(); toast("Les données n'ont pas pu être chargées."); });
+</script>
+
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}</script>
+</body></html>
+{
+  "name": "Procédures Automates",
+  "short_name": "Procédures",
+  "description": "Procédures des automates de laboratoire : saisie vocale, écoute, photos, export Word.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef2f3",
+  "theme_color": "#0d6b7a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
+const CACHE="procedures-v5";
+const CORE=["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"];
+self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(CORE.map(u=>c.add(u)))).then(()=>self.skipWaiting()));});
+self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim()));});
+self.addEventListener("fetch",e=>{
+  const r=e.request; if(r.method!=="GET") return;
+  const u=new URL(r.url);
+  if(u.origin===location.origin && (r.mode==="navigate"||u.pathname.endsWith(".html"))){
+    e.respondWith(fetch(r).then(res=>{const cp=res.clone();caches.open(CACHE).then(c=>c.put(r,cp));return res;}).catch(()=>caches.match(r).then(m=>m||caches.match("index.html"))));return;
+  }
+  if(u.origin===location.origin||/fonts\.(googleapis|gstatic)\.com|cdnjs\.cloudflare\.com/.test(u.host)){
+    e.respondWith(caches.match(r).then(m=>m||fetch(r).then(res=>{if(res.ok||res.type==="opaque"){const cp=res.clone();caches.open(CACHE).then(c=>c.put(r,cp));}return res;})));
+  }
+});
