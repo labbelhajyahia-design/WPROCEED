@@ -164,6 +164,14 @@ mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
 .qres{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
 .qres-item{width:100%;text-align:left;display:grid;gap:2px;background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;font-size:.98rem}
 .qres-item:hover{border-color:var(--accent)}
+.corr{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:10px 14px}
+.corr summary{cursor:pointer;font-weight:700;font-size:.95rem;min-height:32px;display:flex;align-items:center;gap:6px}
+.corr[open]{display:grid;gap:10px}
+.corr-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.corr-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.corr-list s{color:var(--muted)}
+.corr-add{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+@media (max-width:520px){.corr-add{grid-template-columns:1fr}}
 .q-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .q-head h3{min-width:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
@@ -286,6 +294,7 @@ const Store = { mode:"local", db:null, assets:null, sample:null, downloads:null,
       claude.use("downloads").then(d=>{ this.downloads=d; }).catch(()=>{});
       claude.use("sample").then(async s=>{ this.sample=s; if(s){ const l=await s.limits().catch(()=>null); this.images=!!(l&&l.images); } render(); }).catch(()=>{});
     }
+    Corr.load().then(()=>{ if(S.view==="auto"&&S.tab==="saisir"&&!document.activeElement?.matches("input,textarea")) render(); });
     if (this.mode==="db"){
       this.db.collection("automates").onSnapshot(snap=>{
         this.cache = snap.docs.map(d=>({...d.data(), id:d.id}));
@@ -484,6 +493,7 @@ function viewSaisir(d){
     <label class="row" style="gap:8px;font-size:.95rem"><input type="checkbox" id="na" ${rep.na?"checked":""} style="width:20px;height:20px"> Sans objet : cette question ne s'applique pas à cet automate</label>
     ${rep.na?"":`<div class="dictee"><button class="mic ${REC?"on":""}" id="micbtn" data-act="mic" aria-label="${REC?"Arrêter la dictée":"Dicter la réponse"}">${I.mic}</button>
       <div class="hint">${REC?"<strong>Dictée en cours.</strong> Dites « étape suivante » entre deux actions, « question suivante » pour passer à la suite.":(sr?"Touchez le micro et décrivez les actions dans l'ordre. Dites « étape suivante » entre deux actions.":"Ici, la dictée passe par le clavier : touchez la zone de texte puis le micro du clavier Android. Dites « étape suivante » entre deux actions.")}</div></div>
+    ${corrPanel()}
     <label class="f">Réponse<textarea id="answer" data-q="${q.id}" placeholder="Écrivez, collez ou dictez la procédure. Ex. : Aller dans le menu « Maintenance », étape suivante, cliquer sur « Nettoyage quotidien »…">${esc(rep.texte||"")}</textarea></label>
     <div id="preview">${previewHTML(rep)}</div>
     <div class="row"><button class="btn primary" data-act="split">${I.wand}${Store.sample?"Mettre en étapes avec Claude":"Mettre en étapes"}</button><button class="btn" data-act="add-step">${I.plus}Ajouter une étape</button></div>
@@ -605,14 +615,21 @@ function startRec(tid="answer"){
       for(let i=0;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal) f+=r[0].transcript.trim()+" "; else interim=r[0].transcript; }
       fin=f;
       const box=$("#"+tid); if(!box) return;
-      const all=(acc+fin).replace(/\s+/g," ");
+      const all=applyCorr((acc+fin).replace(/\s+/g," "));
       if(tid==="answer" && /question suivante\s*$/i.test(all.trim())){ box.value=all.trim().replace(/[,.]?\s*question suivante\s*$/i,"").trim(); put(box.value); stopRec(); nextQ(true); return; }
       box.value = all+interim; put(box.value);
-      if(tid==="answer"){ const pv=$("#preview"); if(pv) pv.innerHTML=previewHTML(curRep()); }
+      if(tid==="answer"){ setOrig(ALLQ[S.qi].id, box.value); const pv=$("#preview"); if(pv) pv.innerHTML=previewHTML(curRep()); }
+      else S.imp.orig=box.value;
     };
     rec.onerror = e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed"){ REC_WANT=false; toast("Micro non autorisé ici : touchez la zone de texte puis le micro du clavier."); } else if(e.error==="network"){ REC_WANT=false; toast("La dictée a besoin d'Internet."); } };
     rec.onend = ()=>{
-      acc=(acc+fin).replace(/\s+/g," ");
+      const bx=$("#"+tid);
+      if(bx){
+        const prevOrig = tid==="answer" ? (S.orig||{})[ALLQ[S.qi].id] : S.imp.orig;
+        if(prevOrig && bx.value.trim()!==prevOrig.trim()) learnAndApply(prevOrig, bx.value);   /* correction tapée entre deux phrases */
+        acc = bx.value.replace(/\s+/g," ").trim(); acc = acc ? acc+" " : "";
+        if(tid==="answer") setOrig(ALLQ[S.qi].id, bx.value); else S.imp.orig=bx.value;
+      } else acc=(acc+fin).replace(/\s+/g," ");
       if(REC!==rec) return;
       if(REC_WANT){ try{ launch(); return; }catch(err){} }
       REC=null; render();
@@ -627,7 +644,7 @@ function voiceSearch(tid){
   if(!SR){ toast("Touchez le champ de recherche puis le micro du clavier."); box&&box.focus(); return; }
   stopRec(); TTS.stop();
   const rec=new SR(); rec.lang="fr-FR"; rec.interimResults=false; rec.maxAlternatives=1;
-  rec.onresult=e=>{ const v=e.results[0][0].transcript.trim().replace(/[.?!]$/,""); if(tid==="search") S.search=v; else if(tid==="qsearch") S.qsearch=v; else S.searchAll=v; render(); };
+  rec.onresult=e=>{ const v=applyCorr(e.results[0][0].transcript.trim().replace(/[.?!]$/,"")); if(tid==="search") S.search=v; else if(tid==="qsearch") S.qsearch=v; else S.searchAll=v; render(); };
   rec.onerror=e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed") toast("Micro non autorisé ici : touchez le champ puis le micro du clavier."); };
   try{ rec.start(); toast("Dites le mot à rechercher…", 2500); }catch(err){ toast("Recherche vocale indisponible : utilisez le micro du clavier."); }
 }
@@ -671,6 +688,8 @@ function classerLocal(txt){
   return out;
 }
 async function runImport(){
+  if(S.imp.orig && S.imp.orig.trim()!==(S.imp.texte||"").trim()) learnAndApply(S.imp.orig, S.imp.texte);
+  S.imp.orig=null; S.imp.texte=applyCorr(S.imp.texte||"");
   const txt=(S.imp.texte||"").trim(); const a=current();
   if(txt.length<10){ toast("Collez ou dictez d'abord la procédure."); return; }
   stopRec();
@@ -757,9 +776,9 @@ async function transcribeAudio(file){
     catch(e){ throw new Error("le module de reconnaissance n'a pas pu se télécharger (vérifiez Internet)"); }
     setAudioMsg(`Transcription de ${Math.max(1,Math.round(dec.duration))} s d'audio en cours… (environ ${Math.max(1,Math.round(dec.duration/ (S.imp.precis?15:40)))} min)`);
     const out = await pipe(dec.data, {language:"french", task:"transcribe", chunk_length_s:30, stride_length_s:5});
-    const txt = (Array.isArray(out)?out.map(o=>o.text).join(" "):(out&&out.text)||"").replace(/\s+/g," ").trim();
+    const txt = applyCorr((Array.isArray(out)?out.map(o=>o.text).join(" "):(out&&out.text)||"").replace(/\s+/g," ").trim());
     if(!txt) throw new Error("aucune parole reconnue dans ce fichier");
-    S.imp.texte=(S.imp.texte?S.imp.texte.trim()+"\n":"")+txt; S.imp.audio=null; render();
+    S.imp.texte=(S.imp.texte?S.imp.texte.trim()+"\n":"")+txt; S.imp.orig=S.imp.texte; S.imp.audio=null; render();
     toast("Message vocal transcrit. Relisez le texte, puis touchez « Découper en rubriques ».", 6000);
   }catch(e){ S.imp.audio=null; render(); toast("Transcription impossible : "+((e&&e.message)||e)+".", 7000); }
 }
@@ -899,6 +918,7 @@ function decouperLocal(t){
   let txt = String(t||"")
     .replace(/\s*(?:point\s+)?à\s+la\s+ligne\s*/gi, ". ")
     .replace(/\s+virgule\b/gi, ",")
+    .replace(/\b(qu|[ldjnmstc]) (?=[aeiouyhéèêàâîôûœ])/gi, "$1'")       /* « l écran » dicté → « l'écran » */
     .replace(/\s+/g," ").trim();
   /* découpe : ponctuation forte, connecteurs, « tu / vous / on / il faut » + verbe, « attention » */
   const parts = txt.split(new RegExp(String.raw`\s*(?:[.;!?]+\s+|[.;!?]+$|,?\s+(?=${CONNECTEURS}\b)|,?\s+(?=${SUJETS}\s)|,?\s+(?=attention\b)|,?\s+(?=(?:ne\s+(?:jamais|surtout\s+pas|pas)|il\s+ne\s+faut)\b))`, "i"))
@@ -959,11 +979,19 @@ async function splitSteps(btn){
 function nextQ(voix){ saveDraft(false).then(()=>{ if(S.qi<ALLQ.length-1){ S.qi++; render(); window.scrollTo(0,0); TTS.say(ALLQ[S.qi].t, voix?()=>{ if(S.view==="auto"&&S.tab==="saisir"&&!REC) startRec(); }:null); } else { S.tab="lire"; render(); window.scrollTo(0,0); toast("Procédure enregistrée."); } }); }
 async function saveDraft(notify=true){
   /* N'écrit que les questions modifiées ici, par-dessus la version la plus récente (évite d'écraser le travail d'un collègue) */
+  for(const qid of [...(S.touched||[])]){
+    const r=S.draft.reponses[qid]; if(!r) continue;
+    const o=(S.orig||{})[qid];
+    if(o!=null && (r.texte||"").trim() && o.trim()!==(r.texte||"").trim()) learnAndApply(o, r.texte);
+    if(S.orig) delete S.orig[qid];
+    const t0=r.texte||"", t1=applyCorr(t0);
+    if(t1!==t0){ const synced=r.splitFrom===t0; r.texte=t1; for(const e of (r.etapes||[])) for(const k of ["action","bouton","alerte"]) e[k]=applyCorr(e[k]||""); if(synced) r.splitFrom=t1; }
+  }
   const aSplit=[...(S.touched||[])].filter(qid=>needsSplit(S.draft.reponses[qid]));
   if(aSplit.length){ if(notify!=="silent") toast("Mise en étapes automatique…", 2500); for(const qid of aSplit) await autoSplit(S.draft.reponses[qid], QI[qid], S.draft.nom); }
   const latest = Store.get(S.draft.id); const merged = latest ? prepare(clone(latest)) : S.draft;
   for(const qid of (S.touched||[])) if(S.draft.reponses[qid]) merged.reponses[qid]=clone(S.draft.reponses[qid]);
-  try{ await Store.save(merged); S.touched=new Set(); S.draft=prepare(clone(merged)); if(notify) toast("Enregistré."); }
+  try{ await Store.save(merged); S.touched=new Set(); S.draft=prepare(clone(merged)); if(notify) toast(S.lastLearn ? "Enregistré. "+S.lastLearn : "Enregistré.", S.lastLearn?6500:3800); S.lastLearn=null; }
   catch(err){ toast("Enregistrement impossible : "+(err&&err.code==="invalid_argument"?"vous n'avez pas le droit de modifier cette page.":(err&&err.message)||"réessayez.")); throw err; }
 }
 
@@ -1096,7 +1124,7 @@ async function autoSplit(rep, q, nom){
   return rep.etapes.length;
 }
 function promptEtapes(nom, question, txt){
-  return `Tu aides un technicien de laboratoire à rédiger la procédure de l'automate « ${nom} ». Question de la procédure : « ${question} ». Texte saisi ou dicté par le technicien (il peut être copié d'un document, avec des numéros, des titres, des puces, ou contenir des erreurs de dictée et les mots « étape suivante ») : « ${txt} ». Découpe ce texte en étapes, dans l'ordre, sans rien inventer ni ajouter. Une étape = une action concrète, verbe à l'infinitif ; si le texte donne un titre d'étape, commence l'action par ce titre suivi de « : ». Corrige seulement les fautes évidentes. Pour chaque étape : "bouton" = libellé exact du bouton, menu, onglet ou élément cité (chaîne vide si aucun) ; "alerte" = la vérification ou mise en garde associée à cette étape (chaîne vide sinon) ; "niveau" = "absolu" pour une interdiction stricte, "attention" pour une vérification ou une précaution, "" sinon. Réponds uniquement en JSON : {"etapes":[{"action":"","bouton":"","alerte":"","niveau":""}]}`;
+  return `Tu aides un technicien de laboratoire à rédiger la procédure de l'automate « ${nom} ». Question de la procédure : « ${question} ». Texte saisi ou dicté par le technicien (il peut être copié d'un document, avec des numéros, des titres, des puces, ou contenir des erreurs de dictée et les mots « étape suivante ») : « ${txt} ». Découpe ce texte en étapes, dans l'ordre, sans rien inventer ni ajouter. Une étape = une action concrète, verbe à l'infinitif ; si le texte donne un titre d'étape, commence l'action par ce titre suivi de « : ». Corrige seulement les fautes évidentes${Corr.pairs.length?` (corrections connues de la dictée : ${Corr.pairs.slice(0,40).map(p=>`« ${p.de} » = « ${p.vers} »`).join(", ")})`:""}. Pour chaque étape : "bouton" = libellé exact du bouton, menu, onglet ou élément cité (chaîne vide si aucun) ; "alerte" = la vérification ou mise en garde associée à cette étape (chaîne vide sinon) ; "niveau" = "absolu" pour une interdiction stricte, "attention" pour une vérification ou une précaution, "" sinon. Réponds uniquement en JSON : {"etapes":[{"action":"","bouton":"","alerte":"","niveau":""}]}`;
 }
 function previewHTML(rep){
   if (!rep || rep.na || !(rep.texte||"").trim() || !needsSplit(rep)) return "";
@@ -1111,6 +1139,114 @@ function fmtAction(a, ts){
   return m ? `<strong>${hi(m[1],ts)}</strong> : ${hi(m[2],ts)}` : hi(a,ts);
 }
 
+/* ---------- Corrections apprises de la dictée ----------
+   Quand on corrige à l'écrit un passage dicté ou collé (message vocal),
+   la paire « mal compris → correction » est retenue puis appliquée
+   automatiquement aux dictées, messages vocaux et imports suivants. */
+const Corr = { pairs:[], key:"pa-corrections",
+  async load(){
+    try{
+      if (Store.mode==="db"){ const s=await Store.db.doc("reglages/corrections").get(); this.pairs = s.exists ? ((s.data()||{}).pairs||[]) : []; }
+      else { this.pairs = JSON.parse(localStorage.getItem(this.key)||"[]"); }
+    }catch(e){ this.pairs = this.pairs||[]; }
+  },
+  async save(){
+    try{
+      if (Store.mode==="db") await Store.db.doc("reglages/corrections").set({pairs:this.pairs});
+      else localStorage.setItem(this.key, JSON.stringify(this.pairs));
+    }catch(e){ toast("La correction n'a pas pu être enregistrée."); }
+  },
+  async add(list){
+    if (Store.mode==="db"){ try{ const s=await Store.db.doc("reglages/corrections").get(); if(s.exists) this.pairs=(s.data()||{}).pairs||this.pairs; }catch(e){} }
+    for (const p of list){
+      const i=this.pairs.findIndex(x=>norm(x.de)===norm(p.de));
+      if (i>=0) this.pairs[i]={de:p.de, vers:p.vers}; else this.pairs.push({de:p.de, vers:p.vers});
+    }
+    await this.save();
+  },
+  async remove(i){ this.pairs.splice(i,1); await this.save(); }
+};
+const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+function applyCorr(t){
+  if (!t || !Corr.pairs.length) return t;
+  let s = String(t);
+  for (const p of [...Corr.pairs].sort((a,b)=>b.de.length-a.de.length)){
+    if (!p.de) continue;
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])(${escRe(p.de).replace(/\s+/g,"\\s+")})(?=[^\\p{L}\\p{N}]|$)`,"giu");
+    s = s.replace(re, (m,a)=>a+p.vers);
+  }
+  return s;
+}
+const MOTS_OUTILS = new Set("le la les l un une des de du d au aux et ou à a en dans sur sous par pour avec sans ce cet cette ces se sa son ses il elle on tu vous nous je ne pas plus que qui est sont être avoir fait faire puis ensuite alors après avant bien très tout tous toute toutes y si mais car donc".split(" "));
+const tokSplit = s => String(s||"").match(/\S+/g)||[];
+const tokKey = t => norm(t).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
+const stripPunct = s => String(s).replace(/^[^\p{L}\p{N}«"“]+|[^\p{L}\p{N}»"”)]+$/gu,"").trim();
+function pairOK(de, vers){
+  if (!de || !vers || de.length<2) return false;
+  const nd=norm(de), nv=norm(vers);
+  if (de.toLowerCase()===vers.toLowerCase() && !/[A-Z].*[A-Z]/.test(vers)) return false;   /* simple majuscule : pas une correction */
+  const wd=de.split(/\s+/), wv=vers.split(/\s+/);
+  if (wd.length>3 || wv.length>4) return false;
+  if (wd.length===1 && (MOTS_OUTILS.has(nd) || nd.length<=2)) return false;
+  if (/^\d+([.,]\d+)?$/.test(de) || /^\d+([.,]\d+)?$/.test(vers)) return false;  /* une valeur corrigée n'est pas une erreur de dictée */
+  if (nd!==nv && new RegExp(`(^|[^\\p{L}\\p{N}])${escRe(nd)}([^\\p{L}\\p{N}]|$)`,"u").test(nv)) return false;
+  return true;
+}
+function learnFrom(before, after){
+  const A=tokSplit(before), B=tokSplit(after);
+  if (!A.length || !B.length || A.length>800 || B.length>800) return [];
+  const ka=A.map(tokKey), kb=B.map(tokKey), n=A.length, m=B.length, W=m+1;
+  const dp=new Uint16Array((n+1)*(m+1));
+  for (let i=n-1;i>=0;i--) for (let j=m-1;j>=0;j--)
+    dp[i*W+j] = ka[i]===kb[j] ? dp[(i+1)*W+j+1]+1 : Math.max(dp[(i+1)*W+j], dp[i*W+j+1]);
+  const out=[]; let da=[], ib=[], blocks=0, i=0, j=0;
+  const flush=()=>{ if(da.length||ib.length){ blocks++; if(da.length&&ib.length){ const de=stripPunct(da.join(" ")), vers=stripPunct(ib.join(" ")); if(pairOK(de,vers)) out.push({de,vers}); } } da=[]; ib=[]; };
+  while (i<n || j<m){
+    if (i<n && j<m && ka[i]===kb[j]){
+      flush();
+      const ra=stripPunct(A[i]), rb=stripPunct(B[j]);              /* sigle remis en majuscules : bbd → BBD */
+      if (ra!==rb && pairOK(ra,rb)) out.push({de:ra, vers:rb});       /* sigle en majuscules ou accent corrigé */
+      i++; j++;
+    } else if (j>=m || (i<n && dp[(i+1)*W+j] >= dp[i*W+j+1])){ da.push(A[i]); i++; }
+    else { ib.push(B[j]); j++; }
+  }
+  flush();
+  if (blocks>8) return [];                                          /* texte réécrit : ce ne sont pas des erreurs de dictée */
+  const seen=new Set(); return out.filter(p=>{ const k=norm(p.de); if(seen.has(k)) return false; seen.add(k); return true; });
+}
+function learnAndApply(before, after){
+  const pairs = learnFrom(before, after);
+  if (pairs.length){
+    Corr.add(pairs).then(()=>{ const el=document.querySelector(".corr"); if(el) el.outerHTML=corrPanel(); });
+    const txt = pairs.slice(0,3).map(p=>`« ${p.de} » → « ${p.vers} »`).join(", ");
+    S.lastLearn = `Correction retenue : ${txt}. Elle sera appliquée aux prochaines dictées et messages vocaux.`;
+    toast(S.lastLearn, 6000);
+  }
+  return pairs;
+}
+function setOrig(qid, v){ (S.orig=S.orig||{})[qid]=v; }
+function corrPanel(){
+  const L=Corr.pairs;
+  return `<details class="corr" ${S.corrOpen?"open":""}><summary>Corrections automatiques de la dictée <span class="mono">(${L.length})</span></summary>
+    <p class="hint">Corrigez à l'écrit un mot mal compris par la dictée ou par un message vocal : l'appli retient la correction et l'applique toute seule aux prochains messages.</p>
+    ${L.length?`<ul class="corr-list">${L.map((p,i)=>`<li><span><s>${esc(p.de)}</s> → <strong>${esc(p.vers)}</strong></span><button class="icon-btn" data-act="corr-del" data-i="${i}" aria-label="Supprimer la correction ${esc(p.de)}">${I.trash}</button></li>`).join("")}</ul>`:`<p class="muted" style="margin:0">Aucune correction retenue pour l'instant.</p>`}
+    <div class="corr-add"><input type="text" id="corr-de" placeholder="Mot mal compris (ex. bébé dé)" autocomplete="off"><input type="text" id="corr-vers" placeholder="Correction (ex. BBD)" autocomplete="off"><button class="btn small" data-act="corr-add">Ajouter</button></div>
+    ${L.length?`<button class="btn small" data-act="corr-apply">Appliquer aux réponses déjà saisies</button>`:""}
+  </details>`;
+}
+async function corrApplyAll(){
+  const d=S.draft; if(!d) return; let n=0;
+  for (const q of ALLQ){
+    const r=d.reponses[q.id]; if(!r) continue;
+    let changed=false; const t0=r.texte||""; const t1=applyCorr(t0);
+    if (t1!==t0){ r.texte=t1; changed=true; }
+    for (const e of (r.etapes||[])) for (const k of ["action","bouton","alerte"]){ const v=applyCorr(e[k]||""); if(v!==(e[k]||"")){ e[k]=v; changed=true; } }
+    if (changed){ n++; r.splitFrom=r.texte; (S.touched=S.touched||new Set()).add(q.id); }
+  }
+  if (n){ await saveDraft(false).catch(()=>{}); render(); }
+  toast(n ? `${n} réponse${n>1?"s":""} corrigée${n>1?"s":""}.` : "Rien à corriger dans les réponses de cet automate.");
+}
+
 /* ---------- Événements ---------- */
 document.addEventListener("click", async ev=>{
   const t=ev.target.closest("[data-act]"); if(!t) return;
@@ -1118,6 +1254,12 @@ document.addEventListener("click", async ev=>{
   switch(act){
     case "new": go("new",{importAfter:false}); break;
     case "create": createAuto(); break;
+    case "corr-del": await Corr.remove(+t.dataset.i); render(); toast("Correction supprimée."); break;
+    case "corr-add": { const de=($("#corr-de")?.value||"").trim(), vers=($("#corr-vers")?.value||"").trim();
+      if(!de||!vers){ toast("Remplissez le mot mal compris et sa correction."); break; }
+      if(norm(de)===norm(vers) && de===vers){ toast("Les deux mots sont identiques."); break; }
+      await Corr.add([{de, vers}]); S.corrOpen=true; render(); toast(`« ${de} » sera remplacé par « ${vers} » dans les prochaines dictées.`); break; }
+    case "corr-apply": corrApplyAll(); break;
     case "goq": { stopRec(); await saveDraft(false).catch(()=>{}); S.qi=+t.dataset.i; S.qsearch=""; render(); window.scrollTo(0,0); break; }
     case "save-fiche": saveFiche(); break;
     case "new-import": go("new",{importAfter:true}); break;
@@ -1180,6 +1322,9 @@ document.addEventListener("input", ev=>{
   if(t.id==="qsearch"){ S.qsearch=t.value; const box=$("#qresults"); if(box&&S.draft) box.innerHTML=qResults(S.draft); return; }
   if(t.dataset.st!=null){ const r=curRep(); const e=r.etapes[+t.dataset.st]; if(e){ e[t.dataset.k]=t.value; r.splitFrom=r.texte; } }
 });
+document.addEventListener("toggle", ev=>{ if(ev.target.classList && ev.target.classList.contains("corr")) S.corrOpen=ev.target.open; }, true);
+document.addEventListener("focusin", ev=>{ const t=ev.target; if(t.dataset && t.dataset.st!=null && t.dataset.k!=="niveau") t.dataset.orig=t.value; });
+document.addEventListener("paste", ev=>{ const t=ev.target; if(t.id==="answer") setTimeout(()=>setOrig(ALLQ[S.qi].id, t.value),0); else if(t.id==="imptext") setTimeout(()=>{ S.imp.orig=t.value; },0); });
 document.addEventListener("change", async ev=>{
   const t=ev.target;
   if(t.id==="qpick"){ stopRec(); await saveDraft(false).catch(()=>{}); S.qi=+t.value; render(); return; }
@@ -1187,6 +1332,10 @@ document.addEventListener("change", async ev=>{
   if(t.id==="impaudio" && t.files && t.files[0]){ transcribeAudio(t.files[0]); return; }
   if(t.id==="impprecis"){ S.imp.precis=t.value==="1"; return; }
   if(t.id==="impfile" && t.files && t.files[0]){ try{ S.imp.texte=(S.imp.texte?S.imp.texte+"\n":"")+await t.files[0].text(); render(); }catch(e){ toast("Ce fichier ne peut pas être lu."); } return; }
+  if(t.dataset.st!=null && t.dataset.k!=="niveau" && t.dataset.orig!==undefined && t.value!==t.dataset.orig){
+    const pairs=learnAndApply(t.dataset.orig, t.value); t.dataset.orig=t.value;
+    if(pairs.length){ const r=curRep(); const t1=applyCorr(r.texte||""); if(t1!==(r.texte||"")){ r.texte=t1; const box=$("#answer"); if(box) box.value=t1; } r.splitFrom=r.texte; }
+  }
   if(t.dataset.st!=null && t.dataset.k==="niveau"){ const e=curRep().etapes[+t.dataset.st]; if(e) e.niveau=t.value; }
   if(t.id==="sh-file" && t.files && t.files[0]){
     try{ const b=await compress(t.files[0]); if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=b; P.url=URL.createObjectURL(b); P.box=null; drawSheet(); }
