@@ -172,6 +172,11 @@ mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
 .corr-list s{color:var(--muted)}
 .corr-add{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
 @media (max-width:520px){.corr-add{grid-template-columns:1fr}}
+.card-btns{display:flex;flex-direction:column;gap:8px}
+.icon-btn.danger-ic{color:var(--stop)}
+.cards .confirm{margin-top:-4px}
+.hist{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
+.confirm .hint{display:block}
 .q-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .q-head h3{min-width:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
@@ -255,6 +260,8 @@ const I = {
   back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
   up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
   down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  undo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>',
+  reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13"/></svg>',
   target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
   doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12l1.2 5 1.8-4 1.8 4 1.2-5"/></svg>',
@@ -316,6 +323,7 @@ const Store = { mode:"local", db:null, assets:null, sample:null, downloads:null,
   async save(a){
     a.maj = new Date().toISOString();
     const c = clone(a);
+    try{ await Hist.push(this.get(c.id), c); }catch(e){}
     if (this.mode==="db"){ const {id, ...body}=c; await this.db.doc("automates/"+id).set(body); }
     else { await idb.put("automates", c); }
     const i=this.cache.findIndex(x=>x.id===c.id); if(i>=0) this.cache[i]=c; else this.cache.push(c);
@@ -404,8 +412,47 @@ function viewList(){
       <div class="mono muted">${esc([a.fabricant,a.modele].filter(Boolean).join(" · ")||"Fabricant non renseigné")}</div>
       <div class="meter" aria-hidden="true"><i style="width:${p}%"></i></div>
       <div class="muted" style="font-size:.85rem;margin-top:4px">${n} / ${ALLQ.length} questions renseignées</div></div>
-      <button class="icon-btn" data-act="listen-all" data-id="${esc(a.id)}" aria-label="Écouter la procédure de ${esc(a.nom)}">${I.speak}</button></div>`; }).join("")}</div>`
-  : `<div class="empty"><h2>Aucun automate</h2><p class="muted">Ajoutez votre premier automate, puis répondez aux ${ALLQ.length} questions du modèle à la voix ou au clavier. La procédure s'écrit au fur et à mesure.</p><button class="btn primary" data-act="new">${I.plus}Ajouter un automate</button></div>`}`;
+      <div class="card-btns"><button class="icon-btn" data-act="listen-all" data-id="${esc(a.id)}" aria-label="Écouter la procédure de ${esc(a.nom)}">${I.speak}</button>
+      <button class="icon-btn danger-ic" data-act="del-ask" data-id="${esc(a.id)}" aria-label="Supprimer ${esc(a.nom)}">${I.trash}</button></div></div>
+      ${S.confirm&&S.confirm.type==="del-auto"&&S.confirm.id===a.id?`<div class="confirm"><strong>Supprimer « ${esc(a.nom)} » et toutes ses réponses ?</strong><span class="hint">Il reste récupérable dans « Automates supprimés » en bas de la liste.</span><div class="row"><button class="btn danger" data-act="del-auto-yes" data-id="${esc(a.id)}">${I.trash}Supprimer</button><button class="btn" data-act="confirm-no">Annuler</button></div></div>`:""}`; }).join("")}</div>`
+  : `<div class="empty"><h2>Aucun automate</h2><p class="muted">Ajoutez votre premier automate, puis répondez aux ${ALLQ.length} questions du modèle à la voix ou au clavier. La procédure s'écrit au fur et à mesure.</p><button class="btn primary" data-act="new">${I.plus}Ajouter un automate</button></div>`}
+  ${trashBlock()}`;
+}
+/* ---------- Corbeille : un automate supprimé reste récupérable ---------- */
+const Trash = {
+  async list(){
+    if (Store.mode==="db"){ const snap=await Store.db.collection("corbeille").limit(100).get(); return snap.docs.map(d=>({id:d.id, ...(d.data()||{})})).sort((a,b)=>(b.date||"").localeCompare(a.date||"")); }
+    try{ return JSON.parse(localStorage.getItem("pa-corbeille")||"[]"); }catch(e){ return []; }
+  },
+  async put(a){
+    const e={id:a.id, date:new Date().toISOString(), data:clone(a)};
+    if (Store.mode==="db") await Store.db.doc("corbeille/"+a.id).set({date:e.date, data:e.data});
+    else { let l=[]; try{ l=JSON.parse(localStorage.getItem("pa-corbeille")||"[]"); }catch(x){} l=[e,...l.filter(x=>x.id!==a.id)].slice(0,30); try{ localStorage.setItem("pa-corbeille", JSON.stringify(l)); }catch(x){} }
+    S.trash=null;
+  },
+  async drop(id){
+    if (Store.mode==="db") await Store.db.doc("corbeille/"+id).delete();
+    else { let l=[]; try{ l=JSON.parse(localStorage.getItem("pa-corbeille")||"[]"); }catch(x){} try{ localStorage.setItem("pa-corbeille", JSON.stringify(l.filter(x=>x.id!==id))); }catch(x){} }
+    S.trash=null;
+  }
+};
+function trashBlock(){
+  if (S.trash===undefined || S.trash===null){
+    if (!S.trashLoading){ S.trashLoading=true; Trash.list().then(l=>{ S.trash=l; }).catch(()=>{ S.trash=[]; }).finally(()=>{ S.trashLoading=false; if(S.view==="list") render(); }); }
+    return "";
+  }
+  const l=S.trash.filter(t=>!Store.get(t.id)); if(!l.length) return "";
+  return `<details class="corr" style="margin-top:22px" ${S.trashOpen?"open":""} data-trash="1"><summary>Automates supprimés <span class="mono">(${l.length})</span></summary>
+    <ul class="corr-list">${l.map(t=>`<li><span><strong>${esc((t.data&&t.data.nom)||t.id)}</strong><br><span class="mono muted">supprimé le ${esc(dateFR(t.date))}</span></span>
+      <div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn small" data-act="trash-restore" data-id="${esc(t.id)}">Récupérer</button>
+      <button class="icon-btn danger-ic" data-act="trash-purge" data-id="${esc(t.id)}" aria-label="Effacer définitivement ${esc((t.data&&t.data.nom)||t.id)}">${I.trash}</button></div></li>`).join("")}</ul>
+  </details>`;
+}
+async function deleteAuto(id){
+  const a=Store.get(id); if(!a) return;
+  try{ TTS.stop(); try{ await Trash.put(a); }catch(e){} await withTimeout(Store.remove(id), 12000);
+    S.confirm=null; S.confirmDel=false; go("list",{autoId:null}); toast(`« ${a.nom} » supprimé. Récupérable dans « Automates supprimés ».`, 6000); }
+  catch(e){ toast("Suppression impossible : "+errMsg(e)+".", 6000); }
 }
 function qResults(d){
   const ts=terms(S.qsearch||""); if(!ts.length) return "";
@@ -498,6 +545,7 @@ function viewSaisir(d){
     <div id="preview">${previewHTML(rep)}</div>
     <div class="row"><button class="btn primary" data-act="split">${I.wand}${Store.sample?"Mettre en étapes avec Claude":"Mettre en étapes"}</button><button class="btn" data-act="add-step">${I.plus}Ajouter une étape</button></div>
     <div class="edit-steps">${(rep.etapes||[]).map((e,i)=>stepEditor(e,i,rep.etapes.length)).join("")}</div>`}
+    ${histBlock(d, q)}
     <div class="navbar"><button class="btn" data-act="prevq" ${S.qi===0?"disabled":""}>${I.back}Précédente</button>
       <div class="row"><button class="btn" data-act="save">Enregistrer</button><button class="btn primary" data-act="nextq">${S.qi===ALLQ.length-1?"Enregistrer et terminer":"Enregistrer et suivante"}</button></div></div>
   </div>`;
@@ -519,6 +567,7 @@ function viewFiche(a){
   <section style="margin-top:28px;display:grid;gap:10px"><h2>Partager la procédure</h2>
     <div class="row"><button class="btn primary" data-act="word-all">${I.doc}Procédure complète (Word)</button><button class="btn" data-act="copy">Copier le texte</button>${Store.downloads?`<button class="btn" data-act="dl-txt">Télécharger (.txt)</button><button class="btn" data-act="dl-json">Sauvegarde (.json)</button>`:""}</div>
     <p class="hint">Le fichier Word reprend les questions, les étapes, les alertes et les photos avec le bouton encadré. Pour une seule rubrique, utilisez le bouton Word de cette rubrique dans l'onglet Procédure.</p></section>
+  ${histFiche(a)}
   <section style="margin-top:28px;display:grid;gap:10px"><h2>Supprimer</h2>
   ${S.confirmDel?`<div class="confirm"><strong>Supprimer « ${esc(a.nom)} » et toutes ses réponses ?</strong><div class="row"><button class="btn danger" data-act="del-yes">Supprimer définitivement</button><button class="btn" data-act="del-no">Annuler</button></div></div>`
   :`<div><button class="btn danger" data-act="del">${I.trash}Supprimer cet automate</button></div>`}</section>`;
@@ -1247,6 +1296,116 @@ async function corrApplyAll(){
   toast(n ? `${n} réponse${n>1?"s":""} corrigée${n>1?"s":""}.` : "Rien à corriger dans les réponses de cet automate.");
 }
 
+/* ---------- Historique : chaque enregistrement garde la version précédente ---------- */
+const Hist = {
+  max(){ return Store.mode==="db" ? 40 : 20; },
+  sig(a){ if(!a) return ""; const {maj, ...rest}=a; return JSON.stringify(rest); },
+  async list(id){
+    if (Store.mode==="db"){
+      const snap = await Store.db.collection(`historique/${id}/versions`).orderBy("date","desc").limit(this.max()+10).get();
+      const l = snap.docs.map(d=>({vid:d.id, ...(d.data()||{})}));
+      for (const old of l.slice(this.max())) Store.db.doc(`historique/${id}/versions/${old.vid}`).delete().catch(()=>{});
+      return l.slice(0,this.max());
+    }
+    try{ return JSON.parse(localStorage.getItem("pa-hist-"+id)||"[]"); }catch(e){ return []; }
+  },
+  async push(prev, next){
+    if (!prev || this.sig(prev)===this.sig(next)) return;
+    const v = {vid: Date.now().toString(36)+uid().slice(0,3), date: new Date().toISOString(), data: clone(prev)};
+    if (Store.mode==="db"){
+      await Store.db.doc(`historique/${prev.id}/versions/${v.vid}`).set({date:v.date, data:v.data});
+    } else {
+      let arr=[]; try{ arr=JSON.parse(localStorage.getItem("pa-hist-"+prev.id)||"[]"); }catch(e){}
+      arr=[v,...arr].slice(0,this.max());
+      for (let n=arr.length; n>0; n=Math.floor(n/2)){ try{ localStorage.setItem("pa-hist-"+prev.id, JSON.stringify(arr.slice(0,n))); break; }catch(e){} }
+    }
+    S.hist=S.hist||{};
+    if (S.hist[prev.id]) S.hist[prev.id]=[v, ...S.hist[prev.id]].slice(0,this.max());
+  }
+};
+function ensureHist(id){
+  S.hist=S.hist||{};
+  if (S.hist[id] || S.histLoading===id) return;
+  S.histLoading=id;
+  Hist.list(id).then(l=>{ S.hist[id]=l; }).catch(()=>{ S.hist[id]=[]; }).finally(()=>{
+    S.histLoading=null;
+    if (current()?.id===id && S.view==="auto" && (S.tab==="fiche" || S.tab==="saisir")) render();
+  });
+}
+const dateFR = iso => { try{ return new Date(iso).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}); }catch(e){ return iso; } };
+function sigQ(r){
+  if (!r) return "vide";
+  if (r.na) return "na";
+  const et=(r.etapes||[]).filter(e=>e.action), t=(r.texte||"").trim();
+  if (!et.length && !t) return "vide";
+  return JSON.stringify([t, et.map(e=>[e.action,e.bouton,e.alerte,e.niveau,e.photo])]);
+}
+function qSummary(r){
+  const s=sigQ(r); if (s==="vide") return "Réponse vide"; if (s==="na") return "Sans objet";
+  const et=stepsOf(r); if (!et.length) return (r.texte||"").slice(0,80);
+  return `${et.length} étape${et.length>1?"s":""} : ${et[0].action.slice(0,70)}${et[0].action.length>70||et.length>1?"…":""}`;
+}
+/* Versions antérieures d'une question, différentes de la réponse enregistrée, la plus récente d'abord */
+function qHist(id, qid){
+  const saved=Store.get(id); const cur=sigQ(saved&&saved.reponses&&saved.reponses[qid]);
+  const seen=new Set([cur]); const out=[];
+  for (const v of (S.hist&&S.hist[id])||[]){
+    const r=v.data&&v.data.reponses&&v.data.reponses[qid]; const s=sigQ(r);
+    if (seen.has(s)) continue; seen.add(s); out.push({vid:v.vid, date:v.date, rep:r});
+  }
+  return out;
+}
+function histBlock(d, q){
+  ensureHist(d.id);
+  const loading=!(S.hist&&S.hist[d.id]);
+  const vers=loading?[]:qHist(d.id, q.id);
+  const conf=S.confirm&&S.confirm.type==="q-reset"&&S.confirm.qid===q.id;
+  return `<section class="hist">
+    <div class="row">
+      <button class="btn small" data-act="q-undo" ${vers.length?"":"disabled"}>${I.undo}Annuler la dernière modification</button>
+      <button class="btn small danger" data-act="q-reset-ask">${I.reset}Réinitialiser la question</button>
+    </div>
+    ${conf?`<div class="confirm"><strong>Vider la réponse à « ${esc(q.t)} » ?</strong><span class="hint">Vous pourrez la récupérer avec « Annuler la dernière modification ».</span><div class="row"><button class="btn danger" data-act="q-reset-yes">Vider la réponse</button><button class="btn" data-act="confirm-no">Garder</button></div></div>`:""}
+    <details class="corr" ${S.histOpen?"open":""} data-hist="1"><summary>Historique de cette question <span class="mono">(${loading?"…":vers.length})</span></summary>
+      ${loading?`<p class="muted" style="margin:0">Chargement de l'historique…</p>`
+      :vers.length?`<ul class="corr-list">${vers.map(v=>`<li><span><span class="mono muted">${esc(dateFR(v.date))}</span><br>${esc(qSummary(v.rep))}</span><button class="btn small" data-act="q-restore" data-vid="${esc(v.vid)}">Restaurer</button></li>`).join("")}</ul>`
+      :`<p class="muted" style="margin:0">Aucune version précédente pour cette question.</p>`}
+    </details>
+  </section>`;
+}
+function histFiche(a){
+  ensureHist(a.id);
+  const l=(S.hist&&S.hist[a.id])||null; const c=S.confirm||{};
+  const confBox=(msg, yes, label)=>`<div class="confirm"><strong>${msg}</strong><span class="hint">La version actuelle reste dans l'historique : vous pourrez revenir en arrière.</span><div class="row"><button class="btn danger" data-act="${yes}">${label}</button><button class="btn" data-act="confirm-no">Annuler</button></div></div>`;
+  return `<section style="margin-top:28px;display:grid;gap:10px"><h2>Historique et réinitialisation</h2>
+    <p class="hint">Chaque enregistrement garde la version précédente de la procédure (les ${Hist.max()} dernières).</p>
+    ${!l?`<p class="muted">Chargement de l'historique…</p>`
+    :l.length?`<ul class="corr-list">${l.map(v=>`<li><span><span class="mono">${esc(dateFR(v.date))}</span><br><span class="muted">${countAnswered(v.data)} / ${ALLQ.length} questions renseignées</span></span>
+        ${c.type==="auto-restore"&&c.vid===v.vid?"":`<button class="btn small" data-act="auto-restore-ask" data-vid="${esc(v.vid)}">Restaurer</button>`}</li>
+        ${c.type==="auto-restore"&&c.vid===v.vid?`<li>${confBox(`Remettre la procédure telle qu'elle était le ${esc(dateFR(v.date))} ?`, "auto-restore-yes", "Restaurer cette version")}</li>`:""}`).join("")}</ul>`
+    :`<p class="muted">Pas encore de version précédente : l'historique commence au prochain enregistrement.</p>`}
+    <div class="row">
+      <button class="btn danger" data-act="auto-reset-ask">${I.reset}Réinitialiser toute la procédure</button>
+      ${SEED && a.id===SEED.id?`<button class="btn" data-act="seed-ask">${I.undo}Revenir à la procédure AutoBio d'origine</button>`:""}
+    </div>
+    ${c.type==="auto-reset"?confBox(`Vider toutes les réponses de « ${esc(a.nom)} » ? La fiche d'identité est conservée.`, "auto-reset-yes", "Tout vider"):""}
+    ${c.type==="seed"?confBox("Remplacer toutes les réponses par la procédure AutoBio d'origine ? La fiche d'identité est conservée.", "seed-yes", "Revenir à l'origine"):""}
+  </section>`;
+}
+async function restoreQuestion(qid, rep, msg){
+  if (!S.draft) return;
+  stopRec(); if (S.orig) delete S.orig[qid];
+  const r = rep ? clone(rep) : {texte:"", etapes:[]};
+  r.splitFrom = r.texte||""; if (!r.etapes) r.etapes=[];
+  S.draft.reponses[qid]=r; (S.touched=S.touched||new Set()).add(qid);
+  S.confirm=null;
+  try{ await saveDraft(false); render(); toast(msg); }catch(e){}
+}
+async function saveWhole(a, msg){
+  try{ await withTimeout(Store.save(a), 12000); S.draft=null; S.confirm=null; render(); window.scrollTo(0,0); toast(msg, 5000); }
+  catch(e){ toast("Opération impossible : "+errMsg(e)+".", 6000); }
+}
+
 /* ---------- Événements ---------- */
 document.addEventListener("click", async ev=>{
   const t=ev.target.closest("[data-act]"); if(!t) return;
@@ -1254,6 +1413,19 @@ document.addEventListener("click", async ev=>{
   switch(act){
     case "new": go("new",{importAfter:false}); break;
     case "create": createAuto(); break;
+    case "confirm-no": S.confirm=null; render(); break;
+    case "q-undo": { const q=ALLQ[S.qi]; const v=qHist(S.draft.id, q.id)[0]; if(!v){ toast("Aucune modification à annuler pour cette question."); break; }
+      await restoreQuestion(q.id, v.rep, `Modification annulée : la question revient à sa version du ${dateFR(v.date)}.`); break; }
+    case "q-restore": { const q=ALLQ[S.qi]; const v=qHist(S.draft.id, q.id).find(x=>x.vid===t.dataset.vid); if(v) await restoreQuestion(q.id, v.rep, `Question restaurée (version du ${dateFR(v.date)}).`); break; }
+    case "q-reset-ask": S.confirm={type:"q-reset", qid:ALLQ[S.qi].id}; render(); break;
+    case "q-reset-yes": await restoreQuestion(ALLQ[S.qi].id, null, "Question réinitialisée. « Annuler la dernière modification » la rétablit."); break;
+    case "auto-restore-ask": S.confirm={type:"auto-restore", vid:t.dataset.vid}; render(); break;
+    case "auto-restore-yes": { const v=((S.hist||{})[a.id]||[]).find(x=>x.vid===S.confirm.vid); if(!v) break;
+      const r=prepare(clone(v.data)); r.id=a.id; await saveWhole(r, `Procédure restaurée telle qu'elle était le ${dateFR(v.date)}.`); break; }
+    case "auto-reset-ask": S.confirm={type:"auto-reset"}; render(); break;
+    case "auto-reset-yes": { const r=clone(a); r.reponses={}; await saveWhole(r, "Procédure réinitialisée : toutes les réponses sont vides. L'historique permet de revenir en arrière."); break; }
+    case "seed-ask": S.confirm={type:"seed"}; render(); break;
+    case "seed-yes": { const r=clone(a); r.reponses=prepare(clone(SEED)).reponses; await saveWhole(r, "Procédure AutoBio d'origine rétablie. L'historique garde la version précédente."); break; }
     case "corr-del": await Corr.remove(+t.dataset.i); render(); toast("Correction supprimée."); break;
     case "corr-add": { const de=($("#corr-de")?.value||"").trim(), vers=($("#corr-vers")?.value||"").trim();
       if(!de||!vers){ toast("Remplissez le mot mal compris et sa correction."); break; }
@@ -1281,7 +1453,7 @@ document.addEventListener("click", async ev=>{
     case "listen-all": { ev.stopPropagation(); const x=Store.get(t.dataset.id); if(x){ if(S.view==="list") go("auto",{autoId:x.id, tab:"lire", draft:null}); TTS.start(itemsFor(x), x.nom); } break; }
     case "listen-rub": { const r=RUBRIQUES.find(r=>r.id===t.dataset.rub); TTS.start(itemsFor(a,[r.id]), r.titre); break; }
     case "jump": document.getElementById("rub-"+t.dataset.rub)?.scrollIntoView({block:"start"}); break;
-    case "tab": if(S.tab==="saisir" && t.dataset.tab!=="saisir"){ stopRec(); await leaveSaisir(); } S.tab=t.dataset.tab; S.confirmDel=false; if(S.tab!=="saisir") S.draft=null; render(); break;
+    case "tab": if(S.tab==="saisir" && t.dataset.tab!=="saisir"){ stopRec(); await leaveSaisir(); } S.tab=t.dataset.tab; S.confirmDel=false; S.confirm=null; if(S.tab==="fiche"&&S.hist&&current()&&Store.mode==="db") delete S.hist[current().id]; if(S.tab!=="saisir") S.draft=null; render(); break;
     case "answer": S.tab="saisir"; S.draft=null; S.qi=ALLQ.findIndex(q=>q.id===t.dataset.q); render(); window.scrollTo(0,0); break;
     case "say-q": TTS.say(ALLQ[S.qi].t); break;
     case "mic": startRec(); break;
@@ -1297,7 +1469,13 @@ document.addEventListener("click", async ev=>{
     case "dl-txt": case "dl-json": { try{ const json=act==="dl-json"; await Store.downloads.save({filename:`${(a.nom||"automate").replace(/[^\wÀ-ÿ-]+/g,"_")}.${json?"json":"txt"}`, data: json?JSON.stringify(a,null,2):procedureText(a)}); }catch(e){ toast("Téléchargement annulé."); } break; }
     case "del": S.confirmDel=true; render(); break;
     case "del-no": S.confirmDel=false; render(); break;
-    case "del-yes": try{ TTS.stop(); await Store.remove(a.id); go("list",{autoId:null, confirmDel:false}); toast("Automate supprimé."); }catch(e){ toast("Suppression impossible."); } break;
+    case "del-yes": await deleteAuto(a.id); break;
+    case "del-ask": S.confirm={type:"del-auto", id:t.dataset.id}; render(); break;
+    case "del-auto-yes": await deleteAuto(t.dataset.id); break;
+    case "trash-restore": { const e=(S.trash||[]).find(x=>x.id===t.dataset.id); if(!e) break;
+      try{ const r=prepare(clone(e.data)); r.id=e.id; await withTimeout(Store.save(r), 12000); await Trash.drop(e.id).catch(()=>{}); render(); toast(`« ${r.nom} » récupéré.`); }catch(err){ toast("Récupération impossible : "+errMsg(err)+".", 6000); } break; }
+    case "trash-purge": { if(!(S.confirm&&S.confirm.type==="purge"&&S.confirm.id===t.dataset.id)){ S.confirm={type:"purge", id:t.dataset.id}; toast("Touchez encore la corbeille pour effacer définitivement."); break; }
+      try{ await Trash.drop(t.dataset.id); S.confirm=null; render(); toast("Effacé définitivement."); }catch(err){ toast("Impossible d'effacer."); } break; }
     case "p-toggle": TTS.toggle(); break;
     case "p-prev": TTS.move(-1); break;
     case "p-next": TTS.move(1); break;
@@ -1322,7 +1500,7 @@ document.addEventListener("input", ev=>{
   if(t.id==="qsearch"){ S.qsearch=t.value; const box=$("#qresults"); if(box&&S.draft) box.innerHTML=qResults(S.draft); return; }
   if(t.dataset.st!=null){ const r=curRep(); const e=r.etapes[+t.dataset.st]; if(e){ e[t.dataset.k]=t.value; r.splitFrom=r.texte; } }
 });
-document.addEventListener("toggle", ev=>{ if(ev.target.classList && ev.target.classList.contains("corr")) S.corrOpen=ev.target.open; }, true);
+document.addEventListener("toggle", ev=>{ if(ev.target.classList && ev.target.classList.contains("corr")){ if(ev.target.dataset.hist) S.histOpen=ev.target.open; else if(ev.target.dataset.trash) S.trashOpen=ev.target.open; else S.corrOpen=ev.target.open; } }, true);
 document.addEventListener("focusin", ev=>{ const t=ev.target; if(t.dataset && t.dataset.st!=null && t.dataset.k!=="niveau") t.dataset.orig=t.value; });
 document.addEventListener("paste", ev=>{ const t=ev.target; if(t.id==="answer") setTimeout(()=>setOrig(ALLQ[S.qi].id, t.value),0); else if(t.id==="imptext") setTimeout(()=>{ S.imp.orig=t.value; },0); });
 document.addEventListener("change", async ev=>{
