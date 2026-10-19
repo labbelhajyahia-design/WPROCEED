@@ -177,6 +177,10 @@ mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
 .cards .confirm{margin-top:-4px}
 .hist{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
 .confirm .hint{display:block}
+.pick-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pick-row .pick{padding:22px 12px}
+.pick svg{width:28px;height:28px;color:var(--accent)}
+@media (max-width:380px){.pick-row{grid-template-columns:1fr}}
 .q-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .q-head h3{min-width:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
@@ -255,6 +259,7 @@ const I = {
   prev:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>',
   next:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>',
   speak:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  img:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
   cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -713,26 +718,78 @@ function viewImport(a){
       <div class="row" style="margin-top:20px"><button class="btn primary" data-act="imp-save">Enregistrer dans la procédure</button></div>`;
   }
   return `<header class="top"><button class="btn ghost back" data-act="imp-back">${I.back}${esc(a.nom)}</button><span class="eyebrow">Importer une procédure complète</span><h1>Tout dire d'un coup</h1>
-    <p class="muted">Collez, chargez ou dictez la procédure entière. L'appli la range dans les ${RUBRIQUES.length} rubriques et les ${ALLQ.length} questions du modèle, puis vous vérifiez avant d'enregistrer.</p></header>
+    <p class="muted">Importez un fichier, collez ou dictez la procédure entière. L'appli la range dans les ${RUBRIQUES.length} rubriques et les ${ALLQ.length} questions du modèle, puis vous vérifiez avant d'enregistrer.</p></header>
   <div class="wizard">
+    <section class="audio-imp"><h3>${I.doc} Importer un fichier</h3>
+      <p class="hint">Procédure existante en Word (.docx), PDF ou texte (.txt). Le texte est extrait puis rangé automatiquement dans les rubriques et les questions.</p>
+      ${S.imp.file&&S.imp.file.busy?`<div class="row"><span class="spinner" aria-hidden="true"></span><span id="filemsg">${esc(S.imp.file.msg||"")}</span></div>`
+      :`<div class="row"><label class="btn primary" for="impfile">${I.doc}Choisir un fichier Word, PDF ou texte</label></div>`}
+      <input type="file" id="impfile" accept=".docx,.pdf,.txt,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain" class="sr">
+    </section>
     <div class="dictee"><button class="mic ${REC?"on":""}" data-act="mic-imp" aria-label="${REC?"Arrêter la dictée":"Dicter la procédure"}">${I.mic}</button>
       <div class="hint">${REC?"<strong>Dictée en cours.</strong> Décrivez dans l'ordre : avant de démarrer, démarrage, calibration et contrôles, tests, arrêt.":(sr?"Touchez le micro et dictez la procédure dans l'ordre où vous la faites.":"Ici, la dictée passe par le clavier : touchez la zone de texte puis le micro du clavier Android.")}</div></div>
     <label class="f">Procédure complète<textarea id="imptext" style="min-height:260px" placeholder="Ex. : Avant de démarrer, vérifier le flacon System Wash… Pour démarrer, aller sur l'écran État puis Initialisation BBD… Pour la calibration…">${esc(S.imp.texte)}</textarea></label>
     <div class="row"><button class="btn primary" data-act="imp-run" ${S.imp.busy?"disabled":""}>${I.wand}${S.imp.busy?"Découpage en cours…":Store.sample?"Découper en rubriques avec Claude":"Découper en rubriques"}</button>
-      <label class="btn" for="impfile">Charger un fichier texte</label><input type="file" id="impfile" accept=".txt,text/plain" class="sr"></div>
+    </div>
     ${audioBlock()}
   </div>`;
 }
+/* Titres de section reconnus dans un document importé → rubrique du modèle (ordre = priorité) */
+const TITRES_RUB = [
+  ["arreter", ["arret","fermeture","extinction","eteindre","fin de journee","fin de serie","apres l'essai","apres essai","post-essai","post essai","maintenance cote"]],
+  ["calibration", ["calibration","calibrer","controle qualite","controles qualite","controle de qualite","cq","etalonnage"]],
+  ["avant", ["avant de demarrer","avant demarrage","preparation","consommable","verifications prealables","pre-analytique","pre analytique","check-list","checklist"]],
+  ["demarrer", ["demarrage","demarrer","mise en route","mise en marche","allumage","initialisation","mise sous tension"]],
+  ["test", ["passer un test","passage des echantillons","chargement des echantillons","requete","lancement des analyses","lancer une serie","analyse des patients","passer les patients"]],
+  ["reactifs", ["reactif","reactifs","changement de reactif","remplacement","ajout d'echantillon","urgence"]],
+  ["valider", ["validation","valider","resultats","resultat","interpretation"]],
+  ["alertes", ["alertes","alerte","securite","regles","consignes","precautions","interdit","attention"]],
+  ["maintenance", ["maintenance","panne","pannes","depannage","erreurs","entretien","hebdomadaire","mensuelle"]]
+];
+function rubriqueDuTitre(l){
+  const t=norm(l).replace(/^[\d.)\s\-–•#]+/,"").replace(/[:.]+$/,"").trim();
+  if (!t || t.split(/\s+/).length>8 || t.length>70) return null;
+  for (const [rid, kws] of TITRES_RUB) if (kws.some(k=>t===k || t.startsWith(k+" ") || t.endsWith(" "+k) || t.includes(" "+k+" ") || t.startsWith(k))) return rid;
+  return null;
+}
+function qDansRubrique(rid, st, prev){
+  const r=RUBRIQUES.find(x=>x.id===rid); const n=" "+norm(st.action+" "+st.bouton+" "+st.alerte)+" ";
+  let best=null, sc=0;
+  for (const q of r.q){ const v=(KW[q.id]||[]).reduce((s,k)=>s+(n.includes(k)?1:0),0); if (v>sc){ sc=v; best=q.id; } }
+  return best || prev || r.q[0].id;
+}
 function classerLocal(txt){
-  const out={}; let cur=null;
-  for(const st of decouperTexte(txt)){
-    const n=" "+norm(st.action)+" "; const sc={};
-    for(const q of ALLQ){ sc[q.id]=(KW[q.id]||[]).reduce((s,k)=>s+(n.includes(k)?1:0),0); }
-    const best=Object.keys(sc).sort((x,y)=>sc[y]-sc[x])[0];
-    if(sc[best]>0 && (!cur || sc[best]>sc[cur])) cur=best;
-    const qid=cur||"a3";
-    (out[qid]=out[qid]||[]).push(st);
-    if(st.niveau==="absolu" && qid!=="a1") (out.a1=out.a1||[]).push({...st, id:uid()});
+  const out={}; const add=(qid,st)=>{ (out[qid]=out[qid]||[]).push(st);
+    if(st.niveau==="absolu" && qid!=="a1"){ const regle = !/\b(jamais|interdit|ne pas|surtout pas)\b/i.test(st.action) && st.alerte ? {id:uid(), action:st.alerte, bouton:"", alerte:"", niveau:"absolu", photo:"", box:null} : {...st, id:uid()}; (out.a1=out.a1||[]).push(regle); } };
+  const lignes=String(txt||"").split(/\n/).map(l=>l.trim()).filter(Boolean);
+  /* 1. découper le document en sections d'après ses titres */
+  const sections=[]; let sec={rid:null, lignes:[]};
+  lignes.forEach((l,i)=>{
+    const rid = /[.!?;]$/.test(l) ? null : rubriqueDuTitre(l);
+    if (rid){ if (sec.lignes.length || sec.rid) sections.push(sec); sec={rid, lignes:[]}; return; }
+    if (i<3 && !sections.length && !sec.lignes.length && /\bprocedure|mode operatoire|fiche\b/.test(norm(l)) && l.split(/\s+/).length<=10 && !/[.!?]$/.test(l)) return;   /* titre du document */
+    sec.lignes.push(l);
+  });
+  sections.push(sec);
+  /* 2. ranger les étapes de chaque section dans les questions de sa rubrique */
+  let cur=null;
+  for (const sc of sections){
+    if (!sc.lignes.length) continue;
+    const steps = decouperTexte(sc.lignes.join("\n"));
+    let prev=null;
+    for (const st of steps){
+      if (sc.rid){
+        let qid = sc.rid==="alertes" ? (/\b(jamais|interdit|ne pas|surtout pas)\b/i.test(st.action)?"a1":qDansRubrique("alertes",st,prev)) : qDansRubrique(sc.rid, st, prev);
+        if (st.niveau==="absolu" && sc.rid==="alertes") qid="a1";
+        add(qid, st); prev=qid; cur=qid;
+      } else {
+        const n=" "+norm(st.action)+" "; const scs={};
+        for (const q of ALLQ) scs[q.id]=(KW[q.id]||[]).reduce((s,k)=>s+(n.includes(k)?1:0),0);
+        const best=Object.keys(scs).sort((x,y)=>scs[y]-scs[x])[0];
+        if (scs[best]>0 && (!cur || scs[best]>scs[cur])) cur=best;
+        add(cur||"a3", st);
+      }
+    }
   }
   return out;
 }
@@ -959,7 +1016,8 @@ function boutonParle(inf, reste){
   return "";
 }
 function nettoyerBouton(b){
-  b = String(b||"").replace(/[«»"“”]/g,"").replace(STOP_BOUTON,"").replace(/[.,;:!?]+$/,"").trim();
+  const q = String(b||"").match(/^\s*[«"“]\s*([^»"”]{1,45}?)\s*[»"”]/); if (q) return cap(q[1].trim());
+  b = String(b||"").replace(/[«»"“”]/g,"").split(/[,;]/)[0].replace(STOP_BOUTON,"").replace(/[.,;:!?]+$/,"").trim();
   if (!b || b.split(/\s+/).length>6) return "";
   return cap(b);
 }
@@ -1058,12 +1116,17 @@ function drawSheet(){
     <div class="row" style="justify-content:space-between"><button class="btn ghost back" data-act="sh-close">${I.back}Retour</button><span class="eyebrow">Étape ${P.i+1}</span></div>
     <h2>${esc(e.action||"Étape sans texte")}</h2>
     <label class="f">Bouton ou menu à mettre en évidence<input type="text" id="sh-bouton" value="${esc(P.bouton)}" placeholder="Libellé exact à l'écran"></label>
-    <input type="file" id="sh-file" accept="image/*" capture="environment" class="sr">
+    <input type="file" id="sh-cam" accept="image/*" capture="environment" class="sr">
+    <input type="file" id="sh-gal" accept="image/*" class="sr">
     ${P.url?`<div class="stage" id="stage"><img src="${esc(P.url)}" alt="Photo de l'étape">${b?`<div class="hl" style="left:${b.x*100}%;top:${b.y*100}%;width:${b.w*100}%;height:${b.h*100}%"></div>`:""}</div>
       <p class="hint">Faites glisser le doigt sur la photo pour encadrer le bouton ou le menu.${canDetect?" Ou laissez Claude le repérer.":""}</p>
       <div class="row">${canDetect?`<button class="btn primary" data-act="sh-detect" ${P.busy?"disabled":""}>${I.target}${P.busy?"Recherche du bouton…":"Repérer le bouton"}</button>`:""}
-      ${b?`<button class="btn" data-act="sh-clear">Effacer le cadre</button>`:""}<button class="btn" data-act="sh-pick">${I.cam}Changer de photo</button><button class="btn danger" data-act="sh-remove">Retirer la photo</button></div>`
-    :`<label class="pick" for="sh-file">${I.cam}<strong>Prendre ou choisir une photo</strong><span class="hint">Photographiez l'écran ou la partie de l'automate concernée par cette étape.</span></label>`}
+      ${b?`<button class="btn" data-act="sh-clear">Effacer le cadre</button>`:""}<label class="btn" for="sh-cam">${I.cam}Reprendre une photo</label><label class="btn" for="sh-gal">${I.img}Autre image de la galerie</label><button class="btn danger" data-act="sh-remove">Retirer la photo</button></div>`
+    :`<div class="pick-row">
+        <label class="pick" for="sh-cam">${I.cam}<strong>Prendre une photo</strong><span class="hint">Ouvre l'appareil photo du téléphone.</span></label>
+        <label class="pick" for="sh-gal">${I.img}<strong>Choisir dans la galerie</strong><span class="hint">Une photo ou une capture d'écran déjà enregistrée.</span></label>
+      </div>
+      <p class="hint" style="margin:0">Photographiez l'écran ou la partie de l'automate concernée par cette étape, puis encadrez le bouton.</p>`}
     <div class="row"><button class="btn primary" data-act="sh-done" ${P.busy?"disabled":""}>Valider</button><button class="btn" data-act="sh-close">Annuler</button></div>
   </div>`;
   const st=$("#stage"); if(st) bindStage(st);
@@ -1101,8 +1164,9 @@ async function finishPhoto(){
 function leaveSaisir(){ return (S.view==="auto" && S.tab==="saisir" && S.draft) ? saveDraft(false).catch(()=>{}) : Promise.resolve(); }
 /* ---------- Détection automatique des étapes dans un texte saisi ---------- */
 const lowerFirst = s => s && !/^[A-ZÀ-Ý]{2}/.test(s) ? s.charAt(0).toLowerCase()+s.slice(1) : s;
+const PUCES = /^[ \t]*[\uF000-\uF8FF▪●◦‣⁃∙·○■□➢➤►✓✔][ \t]*/gm;     /* puces Word / PDF (police Symbol) → « • » */
 function decouperTexte(t){
-  const lines = String(t||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const lines = String(t||"").replace(PUCES,"• ").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   const marker = l => /^(\d{1,2}[.)]?|étape\s*\d+\s*[:.)\-–]?|[•\-*–])$/i.test(l);
   const inlineNum = l => /^(?:\d{1,2}|étape\s*\d+)\s*[:.)\-–]\s+\S/i.test(l);
   const bullet = l => /^[•\-*–]\s+\S/.test(l);
@@ -1119,10 +1183,20 @@ function decouperTexte(t){
     if (bulletNext){ isBullet=true; bulletNext=false; }
     if (!b) nb();
     if (!b.titre && !b.items.length && !isBullet && txt.length<70 && !/[.!?;]$/.test(txt)){ b.titre=txt; continue; }
-    b.items.push(txt);
+    b.items.push(txt); (b.puces=b.puces||[]).push(isBullet);
   }
   const out=[];
+  /* bloc sans titre fait de puces : une étape par puce (les « Attention : … » restent rattachés à l'étape d'avant) */
+  const blocs=[];
   for (const k of blocks){
+    if (!k.titre && k.items.length>1 && (k.puces||[]).filter(Boolean).length>=2){
+      for (const it of k.items){
+        if (/^(vérification|vérifier|attention|important|remarque|note|nb)\s*:/i.test(it) && blocs.length) blocs[blocs.length-1].items.push(it);
+        else blocs.push({titre:"", items:[it]});
+      }
+    } else blocs.push(k);
+  }
+  for (const k of blocs){
     if (!k.titre && !k.items.length) continue;
     const instr=[], alerts=[]; let niv="";
     for (const it of k.items){
@@ -1406,6 +1480,106 @@ async function saveWhole(a, msg){
   catch(e){ toast("Opération impossible : "+errMsg(e)+".", 6000); }
 }
 
+/* ---------- Import d'un fichier Word (.docx), PDF ou texte ---------- */
+const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    const old=document.querySelector(`script[data-src="${src}"]`);
+    if (old){ if (old.dataset.ok) return res(); old.addEventListener("load",()=>res()); old.addEventListener("error",()=>rej(new Error("module non chargé"))); return; }
+    const s=document.createElement("script"); s.src=src; s.dataset.src=src;
+    s.onload=()=>{ s.dataset.ok="1"; res(); }; s.onerror=()=>rej(new Error("module non chargé")); document.head.appendChild(s);
+  });
+}
+async function pdfLib(){
+  if (!window.pdfjsLib) await loadScript(PDFJS_URL);
+  if (!window.pdfjsWorker) await loadScript(PDFJS_WORKER);      /* lecture dans la page, sans worker séparé */
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+  return window.pdfjsLib;
+}
+async function extraireDocx(file){
+  if (!window.JSZip) throw new Error("le module Word n'est pas chargé (vérifiez Internet)");
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const f = zip.file("word/document.xml"); if (!f) throw new Error("ce fichier Word est illisible");
+  const doc = new DOMParser().parseFromString(await f.async("string"), "application/xml");
+  const body = doc.getElementsByTagNameNS("*","body")[0]; if (!body) return "";
+  const texteDe = el => { let s=""; for (const n of el.getElementsByTagNameNS("*","*")){ const k=n.localName; if (k==="t") s+=n.textContent; else if (k==="tab") s+=" "; else if (k==="br"||k==="cr") s+="\n"; } return s; };
+  const out=[];
+  for (const c of body.children){
+    if (c.localName==="p"){
+      const t=texteDe(c).replace(/[ \t]+/g," ").trim(); if (!t) continue;
+      const liste = c.getElementsByTagNameNS("*","numPr").length>0;
+      out.push(liste && !/^([•\-*–]|\d+[.)])\s/.test(t) ? "• "+t : t);
+    } else if (c.localName==="tbl"){
+      for (const tr of c.getElementsByTagNameNS("*","tr")){
+        const cells=[...tr.getElementsByTagNameNS("*","tc")].map(tc=>texteDe(tc).replace(/\s+/g," ").trim()).filter(Boolean);
+        if (cells.length) out.push(cells.join(" — "));
+      }
+    }
+  }
+  return out.join("\n");
+}
+async function extrairePdf(file, onMsg){
+  const lib = await pdfLib();
+  const pdf = await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()), isEvalSupported:false, disableFontFace:true}).promise;
+  const pages=[];
+  for (let p=1; p<=pdf.numPages; p++){
+    onMsg && onMsg(`Lecture du PDF : page ${p} / ${pdf.numPages}…`);
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const lignes=[]; let ligne="", y0=null;
+    for (const it of tc.items){
+      if (typeof it.str!=="string") continue;
+      const y=Math.round(it.transform[5]);
+      if (y0!==null && Math.abs(y-y0)>2 && ligne.trim()){ lignes.push(ligne.trim()); ligne=""; }
+      ligne += (ligne && !/\s$/.test(ligne) && it.str && !/^\s/.test(it.str) ? " " : "") + it.str;
+      y0=y;
+      if (it.hasEOL && ligne.trim()){ lignes.push(ligne.trim()); ligne=""; y0=null; }
+    }
+    if (ligne.trim()) lignes.push(ligne.trim());
+    pages.push(lignes.join("\n"));
+  }
+  let texte = pages.join("\n").replace(/[ \t]+/g," ").trim();
+  if (texte.replace(/\s/g,"").length >= 30) return texte;
+  /* PDF scanné (image) : Claude lit les pages, quand c'est possible ici */
+  const lim = Store.sample && Store.images ? await Store.sample.limits().catch(()=>null) : null;
+  if (!lim || !lim.images) throw new Error("ce PDF est une image scannée, sans texte à extraire. Ouvrez-le dans l'application dans Claude pour qu'il soit lu, ou copiez son texte");
+  const n = Math.min(pdf.numPages, lim.images.maxCount||5, 8), imgs=[];
+  for (let p=1; p<=n; p++){
+    onMsg && onMsg(`Préparation de la page ${p} / ${n} pour Claude…`);
+    const page=await pdf.getPage(p); const vp=page.getViewport({scale:1.6});
+    const c=document.createElement("canvas"); c.width=vp.width; c.height=vp.height;
+    await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+    imgs.push(await new Promise(r=>c.toBlob(r,"image/jpeg",.85)));
+  }
+  onMsg && onMsg("Claude lit les pages scannées…");
+  const r = await Store.sample(`Ces ${n} images sont les pages, dans l'ordre, d'une procédure d'automate de laboratoire scannée. Recopie fidèlement tout le texte en français, ligne par ligne, en gardant les titres, les numéros d'étape et les puces. N'ajoute rien, ne résume pas. Réponds uniquement avec le texte.`, {images:imgs, modelTier:"default"});
+  texte = ((r&&r.text)||"").trim();
+  if (!texte) throw new Error("aucun texte trouvé dans ce PDF");
+  if (pdf.numPages>n) toast(`Seules les ${n} premières pages ont été lues.`, 6000);
+  return texte;
+}
+async function importerFichier(file){
+  const nom=(file.name||"").toLowerCase();
+  const type = /\.docx$/.test(nom) || file.type==="application/vnd.openxmlformats-officedocument.wordprocessingml.document" ? "docx"
+    : /\.pdf$/.test(nom) || file.type==="application/pdf" ? "pdf"
+    : /\.doc$/.test(nom) || file.type==="application/msword" ? "doc"
+    : /\.(txt|text|md|csv)$/.test(nom) || /^text\//.test(file.type) ? "txt" : "autre";
+  if (type==="doc"){ toast("Ancien format Word (.doc) : ouvrez-le dans Word et enregistrez-le en .docx, puis réessayez.", 7000); return; }
+  if (type==="autre"){ toast("Format non pris en charge. Choisissez un fichier Word (.docx), PDF ou texte (.txt).", 6000); return; }
+  stopRec();
+  S.imp.file={busy:true, msg:`Lecture de « ${file.name} »…`}; render();
+  const msg = m => { if(S.imp.file) S.imp.file.msg=m; const el=$("#filemsg"); if(el) el.textContent=m; };
+  try{
+    let t = type==="txt" ? await file.text() : type==="docx" ? await extraireDocx(file) : await extrairePdf(file, msg);
+    t = applyCorr(String(t||"").replace(/\r\n?/g,"\n").replace(PUCES,"• ").replace(/\n{3,}/g,"\n\n").trim());
+    if (!t) throw new Error("aucun texte trouvé dans ce fichier");
+    S.imp.texte=(S.imp.texte?S.imp.texte.trim()+"\n":"")+t; S.imp.orig=null; S.imp.file=null; render();
+    const n=t.split("\n").filter(Boolean).length;
+    toast(`Texte extrait de « ${file.name} » (${n} ligne${n>1?"s":""}). Découpage en rubriques…`, 4000);
+    await runImport();
+  }catch(e){ S.imp.file=null; render(); toast("Import impossible : "+((e&&e.message)||e)+".", 7000); }
+}
+
 /* ---------- Événements ---------- */
 document.addEventListener("click", async ev=>{
   const t=ev.target.closest("[data-act]"); if(!t) return;
@@ -1482,7 +1656,7 @@ document.addEventListener("click", async ev=>{
     case "p-stop": TTS.stop(); break;
     case "p-rate": { const r=[0.8,1,1.2]; TTS.rate=r[(r.indexOf(TTS.rate)+1)%r.length]; drawPlayer(); if(TTS.playing) TTS.speak(); break; }
     case "sh-close": closeSheet(); break;
-    case "sh-pick": $("#sh-file").click(); break;
+    case "sh-pick": $("#sh-gal").click(); break;
     case "sh-clear": P.box=null; drawSheet(); break;
     case "sh-remove": if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=null; P.url=""; P.ref=""; P.box=null; drawSheet(); break;
     case "sh-detect": detectBox(); break;
@@ -1509,14 +1683,16 @@ document.addEventListener("change", async ev=>{
   if(t.id==="na"){ curRep().na=t.checked; if(t.checked) stopRec(); render(); return; }
   if(t.id==="impaudio" && t.files && t.files[0]){ transcribeAudio(t.files[0]); return; }
   if(t.id==="impprecis"){ S.imp.precis=t.value==="1"; return; }
-  if(t.id==="impfile" && t.files && t.files[0]){ try{ S.imp.texte=(S.imp.texte?S.imp.texte+"\n":"")+await t.files[0].text(); render(); }catch(e){ toast("Ce fichier ne peut pas être lu."); } return; }
+  if(t.id==="impfile" && t.files && t.files[0]){ const f=t.files[0]; t.value=""; importerFichier(f); return; }
   if(t.dataset.st!=null && t.dataset.k!=="niveau" && t.dataset.orig!==undefined && t.value!==t.dataset.orig){
     const pairs=learnAndApply(t.dataset.orig, t.value); t.dataset.orig=t.value;
     if(pairs.length){ const r=curRep(); const t1=applyCorr(r.texte||""); if(t1!==(r.texte||"")){ r.texte=t1; const box=$("#answer"); if(box) box.value=t1; } r.splitFrom=r.texte; }
   }
   if(t.dataset.st!=null && t.dataset.k==="niveau"){ const e=curRep().etapes[+t.dataset.st]; if(e) e.niveau=t.value; }
-  if(t.id==="sh-file" && t.files && t.files[0]){
-    try{ const b=await compress(t.files[0]); if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=b; P.url=URL.createObjectURL(b); P.box=null; drawSheet(); }
+  if((t.id==="sh-cam"||t.id==="sh-gal") && t.files && t.files[0]){
+    const f=t.files[0]; t.value="";
+    if(f.type && !/^image\//.test(f.type)){ toast("Choisissez une image (photo ou capture d'écran)."); return; }
+    try{ const b=await compress(f); if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=b; P.url=URL.createObjectURL(b); P.box=null; drawSheet(); }
     catch(e){ toast("Cette image ne peut pas être lue."); }
   }
 });
