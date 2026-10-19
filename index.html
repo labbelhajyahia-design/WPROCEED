@@ -178,6 +178,17 @@ mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
 .hist{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
 .confirm .hint{display:block}
 .backup-row{margin-top:10px;gap:8px}
+.notes{margin-top:10px;border:1.5px solid var(--warn);background:var(--warn-bg);border-radius:8px;padding:10px 12px}
+.notes-h{display:flex;gap:6px;align-items:center;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.85rem;color:var(--warn)}
+.notes-h svg,.enotes h3 svg{width:18px;height:18px}
+.notes>ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.notes>ul>li{font-size:.95rem;line-height:1.45}
+.notes>ul>li>b{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.05em;font-size:.75rem;margin-right:6px;white-space:nowrap}
+.notes .n-absolu>b{color:var(--stop)} .notes .n-attention>b{color:var(--warn)} .notes .n-info>b{color:var(--muted)}
+.sous{margin:2px 0 0;padding-left:18px;display:grid;gap:2px;font-size:.93rem}
+.steps>li.sec{list-style:none;font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.82rem;color:var(--accent);border-bottom:1px solid var(--line);padding:8px 0 2px;margin-top:4px}
+.enotes{border:1.5px dashed var(--warn);border-radius:var(--r);padding:12px;display:grid;gap:10px;background:var(--surface)}
+.enote{border-top:1px solid var(--line);padding-top:10px;display:grid;gap:8px}
 .pick-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pick-row .pick{padding:22px 12px}
 .pick svg{width:28px;height:28px;color:var(--accent)}
@@ -260,6 +271,7 @@ const I = {
   prev:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>',
   next:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>',
   speak:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>',
   img:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
   cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -362,15 +374,15 @@ const Store = { mode:"local", db:null, assets:null, sample:null, downloads:null,
 };
 function prepare(a){
   a.reponses = a.reponses || {};
-  for (const k in a.reponses){ const r=a.reponses[k]; r.etapes=(r.etapes||[]).map(e=>({id:e.id||uid(), action:e.action||"", bouton:e.bouton||"", alerte:e.alerte||"", niveau:e.niveau||"", photo:e.photo||"", box:e.box||null})); if(r.texte==null) r.texte=r.etapes.map(e=>e.action).join(" "); }
+  for (const k in a.reponses){ const r=a.reponses[k]; r.etapes=(r.etapes||[]).map(normEtape); r.notes=(r.notes||[]).map(normNote); if(r.texte==null) r.texte=r.etapes.map(e=>e.action).join(" "); }
   return a;
 }
 const isNA = (a,qid) => !!(a.reponses&&a.reponses[qid]&&a.reponses[qid].na);
-const hasContent = (a,qid) => { const r=a.reponses&&a.reponses[qid]; return !!(r && !r.na && ((r.etapes&&r.etapes.some(e=>e.action)) || (r.texte&&r.texte.trim()))); };
+const hasContent = (a,qid) => { const r=a.reponses&&a.reponses[qid]; return !!(r && !r.na && ((r.etapes&&r.etapes.some(e=>e.action)) || (r.notes&&r.notes.some(n=>n.texte)) || (r.texte&&r.texte.trim()))); };
 const answered = (a,qid) => isNA(a,qid) || hasContent(a,qid);
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const terms = q => norm(q).split(/\s+/).filter(w=>w.length>1);
-function hay(a,q){ q=QI[q.id]; const r=a.reponses[q.id]||{}; return norm([q.rub.titre,q.t,r.texte,...(r.etapes||[]).flatMap(e=>[e.action,e.bouton,e.alerte])].join(" ")); }
+function hay(a,q){ q=QI[q.id]; const r=a.reponses[q.id]||{}; return norm([q.rub.titre,q.t,r.texte,...(r.etapes||[]).flatMap(e=>[e.section,e.action,e.bouton,e.alerte,...(e.sous||[])]),...(r.notes||[]).flatMap(n=>[n.texte,...(n.sous||[])])].join(" ")); }
 function matchQ(a,q,ts){ if(!ts.length) return true; q=QI[q.id]; if(!hasContent(a,q.id) && !ts.every(w=>norm(q.rub.titre+" "+q.t).includes(w))) return false; const h=hay(a,q); return ts.every(w=>h.includes(w)); }
 function hi(t, ts){ t=String(t??""); if(!ts||!ts.length) return esc(t);
   const chars=[...t]; let n=""; const map=[]; chars.forEach((c,i)=>{ for(const ch of norm(c)){ n+=ch; map.push(i); } });
@@ -511,7 +523,7 @@ function shotHTML(e){
 }
 function viewLire(a){
   const ts=terms(S.search), searching=ts.length>0;
-  const absolus = ALLQ.flatMap(q=>hasContent(a,q.id)?stepsOf(a.reponses[q.id]).filter(e=>e.niveau==="absolu"):[]);
+  const absolus = ALLQ.flatMap(q=>hasContent(a,q.id)?[...notesOf(a.reponses[q.id]).filter(n=>n.niveau==="absolu").map(n=>({action:n.texte, alerte:""})), ...stepsOf(a.reponses[q.id]).filter(e=>e.niveau==="absolu")]:[]);
   let found=0, shown=0;
   const rubs = RUBRIQUES.map((r,ri)=>{
     const qs=r.q.filter(q=>!isNA(a,q.id) && matchQ(a,q,ts));
@@ -524,9 +536,8 @@ function viewLire(a){
       ${anyContent?`<div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn small" data-act="word-rub" data-rub="${r.id}" aria-label="Exporter la rubrique ${esc(r.titre)} en Word">${I.doc}Word</button><button class="btn small" data-act="listen-rub" data-rub="${r.id}" aria-label="Écouter la rubrique ${esc(r.titre)}">${I.speak}Écouter</button></div>`:""}</div>
       ${allNA?`<p class="muted">Sans objet pour cet automate.</p>`:qs.map(q=>{ const rep=a.reponses[q.id];
         if(!hasContent(a,q.id)) return `<div class="q todo"><h3>${esc(q.t)}</h3><div class="row" style="margin-top:6px"><span class="muted">À compléter</span><button class="btn small" data-act="answer" data-q="${q.id}">${I.mic}Répondre</button><button class="btn small ghost" data-act="set-na" data-q="${q.id}">Sans objet</button></div></div>`;
-        const et=stepsOf(rep);
-        return `<div class="q"><div class="q-head"><h3>${hi(q.t,ts)}</h3><button class="btn small" data-act="answer" data-q="${q.id}" aria-label="Corriger : ${esc(q.t)}">Corriger</button></div>${et.length?`<ol class="steps">${et.map((e,i)=>`<li class="step" data-key="${q.id}:${i}"><div class="step-body">
-          <div>${fmtAction(e.action,ts)}${e.bouton?` <span class="kbd">${hi(e.bouton,ts)}</span>`:""}</div>${alertHTML(e,ts)}${shotHTML(e)}</div></li>`).join("")}</ol>`
+        const st=structOf(rep);
+        return `<div class="q"><div class="q-head"><h3>${hi(q.t,ts)}</h3><button class="btn small" data-act="answer" data-q="${q.id}" aria-label="Corriger : ${esc(q.t)}">Corriger</button></div>${st.etapes.length||st.notes.length?repHTML(q.id, st, ts, true)
           :`<p style="margin:8px 0 0" data-key="${q.id}:t">${hi(rep.texte,ts)}</p>`}</div>`; }).join("")}
     </section>`; }).join("");
   return `${searchBox("search", S.search, "Rechercher : calibration, réactif, arrêter…")}
@@ -555,18 +566,33 @@ function viewSaisir(d){
     <label class="f">Réponse<textarea id="answer" data-q="${q.id}" placeholder="Écrivez, collez ou dictez la procédure. Ex. : Aller dans le menu « Maintenance », étape suivante, cliquer sur « Nettoyage quotidien »…">${esc(rep.texte||"")}</textarea></label>
     <div id="preview">${previewHTML(rep)}</div>
     <div class="row"><button class="btn primary" data-act="split">${I.wand}${Store.sample?"Mettre en étapes avec Claude":"Mettre en étapes"}</button><button class="btn" data-act="add-step">${I.plus}Ajouter une étape</button></div>
+    ${notesEditor(rep)}
     <div class="edit-steps">${(rep.etapes||[]).map((e,i)=>stepEditor(e,i,rep.etapes.length)).join("")}</div>`}
     ${histBlock(d, q)}
     <div class="navbar"><button class="btn" data-act="prevq" ${S.qi===0?"disabled":""}>${I.back}Précédente</button>
       <div class="row"><button class="btn" data-act="save">Enregistrer</button><button class="btn primary" data-act="nextq">${S.qi===ALLQ.length-1?"Enregistrer et terminer":"Enregistrer et suivante"}</button></div></div>
   </div>`;
 }
+function notesEditor(rep){
+  const L=rep.notes||[];
+  return `<section class="enotes"><div class="row" style="justify-content:space-between"><h3 style="display:flex;gap:6px;align-items:center">${I.warn}Précautions et alarmes <span class="mono muted">(${L.length})</span></h3><button class="btn small" data-act="note-add">${I.plus}Ajouter</button></div>
+    ${L.length?L.map((n,i)=>`<div class="enote"><div class="grid2" style="grid-template-columns:1fr auto;gap:8px;align-items:end">
+      <label class="f">Texte<textarea id="nt-${n.id}-texte" data-nt="${i}" data-k="texte" rows="2" style="min-height:0">${esc(n.texte)}</textarea></label>
+      <label class="f">Type<select id="nt-${n.id}-niveau" data-nt="${i}" data-k="niveau"><option value="absolu" ${n.niveau==="absolu"?"selected":""}>Règle absolue</option><option value="attention" ${n.niveau==="attention"?"selected":""}>Attention</option><option value="info" ${n.niveau==="info"?"selected":""}>À savoir</option></select></label></div>
+      ${n.sous&&n.sous.length?`<label class="f">Liste (un point par ligne)<textarea id="nt-${n.id}-sous" data-nt="${i}" data-k="sous" rows="${n.sous.length+1}" style="min-height:0">${esc(n.sous.join("\n"))}</textarea></label>`:""}
+      <div class="row" style="gap:6px"><button class="btn small" data-act="note-tostep" data-i="${i}">Transformer en étape</button><button class="btn small danger" data-act="note-del" data-i="${i}">${I.trash}Supprimer</button></div></div>`).join("")
+    :`<p class="hint" style="margin:0">Avertissements, interdictions, conditions et alarmes : ils s'affichent dans un encadré, pas dans les étapes.</p>`}
+  </section>`;
+}
 function stepEditor(e,i,n){
   return `<div class="estep" data-i="${i}"><div class="estep-head"><span class="eyebrow">Étape ${i+1}</span>
     <div class="row" style="gap:4px"><button class="icon-btn" data-act="st-up" data-i="${i}" ${i===0?"disabled":""} aria-label="Monter l'étape">${I.up}</button>
     <button class="icon-btn" data-act="st-down" data-i="${i}" ${i===n-1?"disabled":""} aria-label="Descendre l'étape">${I.down}</button>
+    <button class="icon-btn" data-act="st-tonote" data-i="${i}" aria-label="Transformer en précaution" title="Transformer en précaution">${I.warn}</button>
     <button class="icon-btn" data-act="st-del" data-i="${i}" aria-label="Supprimer l'étape">${I.trash}</button></div></div>
+    <label class="f">Partie (facultatif)<input type="text" id="st-${e.id}-section" data-st="${i}" data-k="section" value="${esc(e.section||"")}" placeholder="Ex. Vérification de l'enregistrement"></label>
     <label class="f">Action<input type="text" id="st-${e.id}-action" data-st="${i}" data-k="action" value="${esc(e.action)}"></label>
+    <label class="f">Points à vérifier ou détails (un par ligne, facultatif)<textarea id="st-${e.id}-sous" data-st="${i}" data-k="sous" rows="${Math.max(2,(e.sous||[]).length+1)}" style="min-height:0">${esc((e.sous||[]).join("\n"))}</textarea></label>
     <div class="grid2"><label class="f">Bouton ou menu utilisé<input type="text" id="st-${e.id}-bouton" data-st="${i}" data-k="bouton" value="${esc(e.bouton)}" placeholder="Libellé exact à l'écran"></label>
     <label class="f">Type d'alerte<select id="st-${e.id}-niveau" data-st="${i}" data-k="niveau"><option value="" ${!e.niveau?"selected":""}>Aucune / remarque</option><option value="attention" ${e.niveau==="attention"?"selected":""}>Attention</option><option value="absolu" ${e.niveau==="absolu"?"selected":""}>Règle absolue</option></select></label></div>
     <label class="f">Alerte ou remarque (facultatif)<input type="text" id="st-${e.id}-alerte" data-st="${i}" data-k="alerte" value="${esc(e.alerte)}"></label>
@@ -598,9 +624,10 @@ function procedureText(a){
     r.q.forEach(q=>{ L.push("", q.t); const rep=a.reponses[q.id];
       if(isNA(a,q.id)){ L.push("  Sans objet pour cet automate"); return; }
       if(!hasContent(a,q.id)){ L.push("  À compléter"); return; }
-      const ets=stepsOf(rep);
-      if(ets.length) ets.forEach((e,i)=>{ L.push(`  ${i+1}. ${e.action}${e.bouton?` [${e.bouton}]`:""}`); if(e.alerte) L.push(`     ${(NIVEAUX[e.niveau]||"Remarque").toUpperCase()} : ${e.alerte}`); });
-      else L.push("  "+rep.texte); }); });
+      const ets=stepsOf(rep), nts=notesOf(rep); let sec="";
+      nts.forEach(n=>{ L.push(`  ⚠ ${(NIV_NOTE[n.niveau]||"Attention").toUpperCase()} : ${n.texte}`); (n.sous||[]).forEach(x=>L.push(`      - ${x}`)); });
+      if(ets.length) ets.forEach((e,i)=>{ if((e.section||"")!==sec){ sec=e.section||""; if(sec) L.push(`  — ${sec} —`); } L.push(`  ${i+1}. ${e.action}${e.bouton?` [${e.bouton}]`:""}`); (e.sous||[]).forEach(x=>L.push(`      - ${x}`)); if(e.alerte) L.push(`     ${(NIVEAUX[e.niveau]||"Remarque").toUpperCase()} : ${e.alerte}`); });
+      else if(!nts.length) L.push("  "+rep.texte); }); });
   return L.join("\n");
 }
 
@@ -627,11 +654,15 @@ function itemsFor(a, rubIds, qids){
     out.push({text:`Rubrique ${ri+1}. ${r.titre}.`, label:r.titre, rub:r.id});
     qs.forEach(q=>{ const rep=a.reponses[q.id];
       out.push({text:q.t, label:r.titre, rub:r.id});
-      const ets=stepsOf(rep);
+      const ets=stepsOf(rep), nts=notesOf(rep);
+      if(nts.length) out.push({text:"Précautions. "+nts.map(n=>`${NIV_NOTE[n.niveau]||"Attention"} : ${n.texte}${n.sous&&n.sous.length?" "+n.sous.join(" ; ")+".":""}`).join(" "), label:`${r.titre} · précautions`, rub:r.id});
+      let sec="";
       if(ets.length) ets.forEach((e,i)=>{
-        let t=`Étape ${i+1}. ${e.action}`; if(e.alerte) t+=` ${e.niveau==="absolu"?"Règle absolue":e.niveau==="attention"?"Attention":"Remarque"} : ${e.alerte}`;
+        let t=""; if((e.section||"")!==sec){ sec=e.section||""; if(sec) t+=`${sec}. `; }
+        t+=`Étape ${i+1}. ${e.action}`; if(e.sous&&e.sous.length) t+=" "+e.sous.join(" ; ")+".";
+        if(e.alerte) t+=` ${e.niveau==="absolu"?"Règle absolue":e.niveau==="attention"?"Attention":"Remarque"} : ${e.alerte}`;
         out.push({text:t, label:`${r.titre} · étape ${i+1}`, key:`${q.id}:${i}`, rub:r.id}); });
-      else out.push({text:rep.texte, label:r.titre, key:`${q.id}:t`, rub:r.id}); }); });
+      else if(!nts.length) out.push({text:rep.texte, label:r.titre, key:`${q.id}:t`, rub:r.id}); }); });
   return out;
 }
 function drawPlayer(){
@@ -720,7 +751,7 @@ function viewImport(a){
       ${RUBRIQUES.map((r,ri)=>{ const qs=r.q.filter(q=>R[q.id]); if(!qs.length) return "";
         return `<section class="rub"><div class="rub-head"><h2><span class="num">${String(ri+1).padStart(2,"0")}</span>${esc(r.titre)}</h2></div>
         ${qs.map(q=>`<div class="q"><h3>${esc(q.t)}</h3>${hasContent(a,q.id)?`<p class="hint" style="margin:2px 0 0">Remplacera la réponse actuelle.</p>`:""}
-          <ol class="steps">${R[q.id].map(e=>`<li class="step"><div class="step-body"><div>${esc(e.action)}${e.bouton?` <span class="kbd">${esc(e.bouton)}</span>`:""}</div>${alertHTML(e)}</div></li>`).join("")}</ol></div>`).join("")}</section>`; }).join("")}
+          ${repHTML(null, R[q.id])}</div>`).join("")}</section>`; }).join("")}
       <div class="row" style="margin-top:20px"><button class="btn primary" data-act="imp-save">Enregistrer dans la procédure</button></div>`;
   }
   return `<header class="top"><button class="btn ghost back" data-act="imp-back">${I.back}${esc(a.nom)}</button><span class="eyebrow">Importer une procédure complète</span><h1>Tout dire d'un coup</h1>
@@ -765,37 +796,32 @@ function qDansRubrique(rid, st, prev){
   return best || prev || r.q[0].id;
 }
 function classerLocal(txt){
-  const out={}; const add=(qid,st)=>{ (out[qid]=out[qid]||[]).push(st);
-    if(st.niveau==="absolu" && qid!=="a1"){ const regle = !/\b(jamais|interdit|ne pas|surtout pas)\b/i.test(st.action) && st.alerte ? {id:uid(), action:st.alerte, bouton:"", alerte:"", niveau:"absolu", photo:"", box:null} : {...st, id:uid()}; (out.a1=out.a1||[]).push(regle); } };
+  const out={}; const get=q=>out[q]=out[q]||{etapes:[], notes:[]};
   const lignes=String(txt||"").split(/\n/).map(l=>l.trim()).filter(Boolean);
-  /* 1. découper le document en sections d'après ses titres */
+  /* 1. découper le document en sections d'après ses titres de rubrique */
   const sections=[]; let sec={rid:null, lignes:[]};
   lignes.forEach((l,i)=>{
     const rid = /[.!?;]$/.test(l) ? null : rubriqueDuTitre(l);
     if (rid){ if (sec.lignes.length || sec.rid) sections.push(sec); sec={rid, lignes:[]}; return; }
-    if (i<3 && !sections.length && !sec.lignes.length && /\bprocedure|mode operatoire|fiche\b/.test(norm(l)) && l.split(/\s+/).length<=10 && !/[.!?]$/.test(l)) return;   /* titre du document */
+    if (i<3 && !sections.length && !sec.lignes.length && /\bprocedure|mode operatoire|fiche\b/.test(norm(l)) && l.split(/\s+/).length<=10 && !/[.!?]$/.test(l)) return;
     sec.lignes.push(l);
   });
   sections.push(sec);
-  /* 2. ranger les étapes de chaque section dans les questions de sa rubrique */
+  /* 2. analyser chaque section et ranger étapes et précautions dans les questions */
   let cur=null;
   for (const sc of sections){
     if (!sc.lignes.length) continue;
-    const steps = decouperTexte(sc.lignes.join("\n"));
-    let prev=null;
-    for (const st of steps){
-      if (sc.rid){
-        let qid = sc.rid==="alertes" ? (/\b(jamais|interdit|ne pas|surtout pas)\b/i.test(st.action)?"a1":qDansRubrique("alertes",st,prev)) : qDansRubrique(sc.rid, st, prev);
-        if (st.niveau==="absolu" && sc.rid==="alertes") qid="a1";
-        add(qid, st); prev=qid; cur=qid;
-      } else {
-        const n=" "+norm(st.action)+" "; const scs={};
-        for (const q of ALLQ) scs[q.id]=(KW[q.id]||[]).reduce((s,k)=>s+(n.includes(k)?1:0),0);
-        const best=Object.keys(scs).sort((x,y)=>scs[y]-scs[x])[0];
-        if (scs[best]>0 && (!cur || scs[best]>scs[cur])) cur=best;
-        add(cur||"a3", st);
-      }
+    const st=parseStruct(sc.lignes.join("\n"), sc.rid==="alertes"?"a3":null);
+    let prev=null; const vus=[];
+    for (const e of st.etapes){
+      let qid;
+      if (sc.rid) qid=qDansRubrique(sc.rid, e, prev);
+      else { const n=" "+norm(e.action)+" "; const scs={}; for (const q of ALLQ) scs[q.id]=(KW[q.id]||[]).reduce((s,k)=>s+(n.includes(k)?1:0),0);
+        const best=Object.keys(scs).sort((x,y)=>scs[y]-scs[x])[0]; if (scs[best]>0 && (!cur || scs[best]>scs[cur])) cur=best; qid=cur||"a3"; }
+      get(qid).etapes.push(e); prev=qid; vus.push(qid);
     }
+    const cible = sc.rid==="alertes" ? "a3" : (vus[0] || (sc.rid ? RUBRIQUES.find(x=>x.id===sc.rid).q[0].id : "a3"));
+    for (const n of st.notes){ get(n.niveau==="absolu" && sc.rid==="alertes" ? "a1" : cible).notes.push(n); }
   }
   return out;
 }
@@ -808,7 +834,8 @@ async function runImport(){
   if(Store.sample){
     S.imp.busy=true; render();
     try{
-      const r = await Store.sample.json(`Tu reçois la procédure complète d'un automate de laboratoire (« ${a.nom} »), écrite ou dictée par un technicien. Range son contenu dans les questions ci-dessous, sans rien inventer : chaque information va dans la question qui lui correspond le mieux ; une question sans information dans le texte est omise. Pour chaque question retenue, découpe en étapes courtes, dans l'ordre, une action par étape, verbe à l'infinitif ; corrige seulement les fautes évidentes de dictée. "bouton" = libellé exact du bouton, menu, onglet ou élément cité dans l'étape (sinon ""), "alerte" = la mise en garde associée (sinon ""), "niveau" = "absolu" pour une interdiction stricte, "attention" pour une précaution, "" sinon. Les interdictions strictes vont aussi dans a1.
+      const r = await Store.sample.json(`Tu reçois la procédure complète d'un automate de laboratoire (« ${a.nom} »), écrite ou dictée par un technicien. Range son contenu dans les questions ci-dessous, sans rien inventer : chaque information va dans la question qui lui correspond le mieux ; une question sans information dans le texte est omise. Corrige seulement les fautes évidentes de dictée. Les questions a1, a2, a3 (alertes) n'ont que des "precautions" ; les interdictions strictes générales vont aussi en a1.
+${REGLES_CLAUDE}
 
 Questions (identifiant : [rubrique] question) :
 ${ALLQ.map(q=>`${q.id} : [${q.rub.titre}] ${q.t}`).join("\n")}
@@ -818,12 +845,11 @@ Procédure :
 ${txt}
 """
 
-Réponds uniquement en JSON : {"reponses":{"<identifiant>":{"etapes":[{"action":"","bouton":"","alerte":"","niveau":""}]}}}`, {modelTier:"default"});
+Réponds uniquement en JSON : {"reponses":{"<identifiant>":${SCHEMA_Q}}}`, {modelTier:"default"});
       const res={};
       for(const [qid,v] of Object.entries((r&&r.reponses)||{})){
         if(!ALLQ.some(q=>q.id===qid)) continue;
-        const et=(v&&Array.isArray(v.etapes)?v.etapes:[]).filter(e=>e&&e.action).map(e=>({id:uid(), action:String(e.action), bouton:String(e.bouton||""), alerte:String(e.alerte||""), niveau:["absolu","attention"].includes(e.niveau)?e.niveau:"", photo:"", box:null}));
-        if(et.length) res[qid]=et;
+        const st=depuisClaude(v); if(st.etapes.length||st.notes.length) res[qid]=st;
       }
       if(!Object.keys(res).length) throw new Error("vide");
       S.imp.result=res; S.imp.busy=false; render(); window.scrollTo(0,0); return;
@@ -833,10 +859,11 @@ Réponds uniquement en JSON : {"reponses":{"<identifiant>":{"etapes":[{"action":
 }
 async function saveImport(){
   const a=prepare(clone(current())); const R=S.imp.result; let n=0;
-  for(const [qid,et] of Object.entries(R)){
+  for(const [qid,st] of Object.entries(R)){
     const old=(a.reponses[qid]&&a.reponses[qid].etapes)||[];
-    const keep=et.map(e=>{ const o=old.find(x=>x.photo&&x.bouton&&norm(x.bouton)===norm(e.bouton)); return o?{...e, photo:o.photo, box:o.box}:e; });
-    a.reponses[qid]={texte:keep.map(e=>e.action).join(" "), etapes:keep, na:false}; n++;
+    const keep=st.etapes.map(e=>{ const o=old.find(x=>x.photo&&x.bouton&&norm(x.bouton)===norm(e.bouton)); return o?{...e, photo:o.photo, box:o.box}:e; });
+    const texte=[...st.notes.map(n=>n.texte), ...keep.map(e=>e.action)].join("\n");
+    a.reponses[qid]={texte, etapes:keep, notes:st.notes, na:false, splitFrom:texte}; n++;
   }
   try{ await Store.save(a); S.imp={texte:"", result:null, busy:false}; go("auto",{tab:"lire", draft:null}); toast(`${n} question${n>1?"s":""} mise${n>1?"s":""} à jour.`); }
   catch(e){ toast("Enregistrement impossible : vous n'avez peut-être pas le droit de modifier cette page."); }
@@ -927,7 +954,7 @@ async function exportWord(a, rubId, btn){
     info.push(`Édité le ${new Date().toLocaleDateString("fr-FR")}`);
     body.push(wPara(wRun(info.join("   ·   "),{sz:18,color:"566A71"}),{after:240}));
     if(!rubId){
-      const abs=ALLQ.flatMap(q=>hasContent(a,q.id)?stepsOf(a.reponses[q.id]).filter(e=>e.niveau==="absolu"):[]);
+      const abs=ALLQ.flatMap(q=>hasContent(a,q.id)?[...notesOf(a.reponses[q.id]).filter(n=>n.niveau==="absolu").map(n=>({action:n.texte, alerte:""})), ...stepsOf(a.reponses[q.id]).filter(e=>e.niveau==="absolu")]:[]);
       if(abs.length){ body.push(wPara(wRun("RÈGLES ABSOLUES",{b:true,color:"B42318"}),{shd:"FDECEA",border:"B42318",before:120,after:60,keep:true}));
         abs.forEach(e=>body.push(wPara(wRun("• "+e.action,{b:true})+(e.alerte?wRun("  "+e.alerte,{color:"566A71"}):""),{shd:"FDECEA",border:"B42318",after:40}))); body.push(wPara("",{after:120})); }
     }
@@ -938,10 +965,18 @@ async function exportWord(a, rubId, btn){
         if(isNA(a,q.id)) continue;
         body.push(wPara(wRun(q.t),{style:"Heading2",keep:true}));
         if(!hasContent(a,q.id)){ body.push(wPara(wRun("À compléter.",{i:true,color:"566A71"}))); continue; }
-        const rep=a.reponses[q.id]; const et=stepsOf(rep);
-        if(!et.length){ body.push(wPara(wRun(rep.texte))); continue; }
+        const rep=a.reponses[q.id]; const et=stepsOf(rep), nts=notesOf(rep);
+        if(nts.length){ body.push(wPara(wRun("PRÉCAUTIONS ET ALARMES",{b:true,color:"9A5B00",sz:20}),{shd:"FFF2D6",border:"9A5B00",after:20,keep:true}));
+          for(const nn of nts){ const c=nn.niveau==="absolu"?"B42318":nn.niveau==="info"?"566A71":"9A5B00";
+            body.push(wPara(wRun((NIV_NOTE[nn.niveau]||"Attention")+" : ",{b:true,color:c,sz:20})+wRun(nn.texte,{sz:20}),{shd:"FFF2D6",border:"9A5B00",after:20}));
+            for(const x of (nn.sous||[])) body.push(wPara(wRun("•  "+x,{sz:20}),{ind:340,shd:"FFF2D6",border:"9A5B00",after:10})); }
+          body.push(wPara("",{after:60})); }
+        if(!et.length){ if(!nts.length) body.push(wPara(wRun(rep.texte))); continue; }
+        let secW="";
         for(let i=0;i<et.length;i++){ const e=et[i];
+          if((e.section||"")!==secW){ secW=e.section||""; if(secW) body.push(wPara(wRun(secW.toUpperCase(),{b:true,color:"0D6B7A",sz:20}),{before:120,after:40,keep:true})); }
           body.push(wPara(wRun(`${i+1}.\t`,{b:true,color:"0D6B7A"})+wRun(e.action)+(e.bouton?wRun("  ")+wRun(` ${e.bouton} `,{font:"Consolas",b:true,sz:19,shd:"E3E9EB"}):""),{ind:567,hang:567,after:60}));
+          for(const x of (e.sous||[])) body.push(wPara(wRun("•  "+x),{ind:850,after:30}));
           if(e.alerte||e.niveau){ const lv=e.niveau==="absolu"?["B42318","FDECEA","RÈGLE ABSOLUE"]:e.niveau==="attention"?["9A5B00","FFF2D6","ATTENTION"]:["566A71","E8EEF0","REMARQUE"];
             body.push(wPara(wRun(lv[2]+(e.alerte?" : ":""),{b:true,color:lv[0],sz:20})+(e.alerte?wRun(e.alerte,{sz:20}):""),{ind:567,shd:lv[1],border:lv[0],after:80})); }
           if(e.photo){ try{ const ph=await photoWithBox(e); if(ph){ n++; zip.file(`word/media/photo${n}.jpeg`, ph.blob);
@@ -971,8 +1006,9 @@ async function saveFile(filename, blob){
 function curRep(){ const q=ALLQ[S.qi]; const d=S.draft; d.reponses[q.id]=d.reponses[q.id]||{texte:"",etapes:[]}; (S.touched=S.touched||new Set()).add(q.id); return d.reponses[q.id]; }
 function setText(v){ curRep().texte=v; }
 function extraireBouton(s){
+  s = String(s||""); s = s.charAt(0).toLowerCase()+s.slice(1);
   const m = s.match(/[«"“]\s*([^»"”]{1,45}?)\s*[»"”]/); if(m) return m[1].trim();
-  const v = s.match(/(?:cliqu(?:er|ez)\s+sur|appuy(?:er|ez)\s+sur|touch(?:er|ez)(?:\s+sur)?|sélectionn(?:er|ez)|ouvr(?:ir|ez)|all(?:er|ez)\s+(?:dans|sur)|rendez-vous\s+dans|menu|onglet|bouton|section)\s+(?:le |la |l'|les |du |de la |sur )?(?:menu |onglet |bouton |écran |section )?([A-ZÉÈÀÂ][\wÀ-ÿ'’ -]{1,45}?)(?=[,.;:!?]|\s+(?:puis|et|pour|en|qui|jusqu|afin|dans)\b|$)/);
+  const v = s.match(/(?:cliqu(?:er|ez)\s+sur|appuy(?:er|ez)\s+sur|touch(?:er|ez)(?:\s+sur)?|sélectionn(?:er|ez)|ouvr(?:ir|ez)|all(?:er|ez)\s+(?:dans|sur)|rendez-vous\s+dans|menu|onglet|bouton|section)\s+(?:le |la |l'|les |du |de la |sur )?(?:menu |onglet |bouton |écran |section )?([A-ZÉÈÀÂ][\wÀ-ÿ'’ -]{1,45}?)(?=[,.;:!?(]|\s+\(|\s+(?:puis|et|pour|en|qui|jusqu|afin|dans|situ[ée])\b|$)/);
   return v ? v[1].trim() : "";
 }
 
@@ -1219,48 +1255,211 @@ function decouperTexte(t){
   }
   return out.length ? out : decouperLocal(t);
 }
+/* ---------- Structure d'une réponse : parties, étapes d'action, points à vérifier, précautions ----------
+   rep.etapes = [{action, bouton, alerte, niveau, section, sous:[…], photo, box}]   (actions numérotées)
+   rep.notes  = [{texte, niveau, sous:[…]}]                                          (précautions, règles, alarmes) */
+const NIV_NOTE = {absolu:"Règle absolue", attention:"Attention", info:"À savoir"};
+const normNote = n => ({id:(n&&n.id)||uid(), texte:String((n&&(n.texte||n.text))||"").trim(), niveau:["absolu","attention","info"].includes(n&&n.niveau)?n.niveau:"attention", sous:Array.isArray(n&&n.sous)?n.sous.map(String).map(s=>s.trim()).filter(Boolean):[]});
+const normEtape = e => ({id:(e&&e.id)||uid(), action:String((e&&e.action)||"").trim(), bouton:String((e&&e.bouton)||"").trim(), alerte:String((e&&e.alerte)||"").trim(), niveau:["absolu","attention"].includes(e&&e.niveau)?e.niveau:"", section:String((e&&e.section)||"").trim(), sous:Array.isArray(e&&e.sous)?e.sous.map(String).map(s=>s.trim()).filter(Boolean):[], photo:(e&&e.photo)||"", box:(e&&e.box)||null});
+const notesOf = rep => structOf(rep).notes;
+
+const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B50}\u{2705}\u{274C}\u{2757}]/gu;
+const RE_NOTE = /^(attention|avertissement|important|remarque|rappel|nb|n\.b\.|note|à savoir|a savoir|cas particulier|ne\s+\S+|jamais|il\s+(est\s+)?(interdit|ne\s+faut|est\s+obligatoire)|interdiction|toujours|en aucun cas|imp[ée]rativement|aucun|le passage .* ne peut|les? .* doi(t|vent)\b)/i;
+const RE_ABS = /(^ne\s|\b(jamais|interdit|interdiction|ne\s+(pas|doit|doivent|peut|surtout)|en aucun cas|obligatoire|imp[ée]rati))/i;
+const RE_INFO = /^(remarque|rappel|nb|n\.b\.|note|à savoir|a savoir|cas particulier)/i;
+const RE_COND = /^(si|en cas d['e]|lorsque|lorsqu'|quand|dès que|des que|au cas où)\b/i;
+const RE_VERIF = /^(v[ée]rifier|contr[ôo]ler|s'assurer|s’assurer|examiner|consulter)\b/i;
+function estAction(l){
+  const t=String(l).replace(/^[A-ZÀ-Ý][^:]{2,60}:\s+/,"");
+  const essai=x=>{ x=x.trim(); return !!premierVerbe(x) || /^(s'|s’)?[a-zàâçéèêëîïôûùü'’-]+(er|ir)\b/i.test(x); };
+  if (essai(t)) return true;
+  const k=t.indexOf(", "); return k>0 && k<90 && essai(t.slice(k+2));       /* « Après le passage, vérifier … » */
+}
+/* le texte commence-t-il par un infinitif (pas un nom comme « Contrôle conforme ») ? */
+const debutInfinitif = l => { const w=(String(l).trim().match(/^(?:s'|s’)?([a-zàâçéèêëîïôûùüÿœ-]+)/i)||[])[1]||""; return /(er|ir)$/i.test(w) || /^(mettre|remettre|attendre|prendre|reprendre|éteindre|lire|relire|faire|introduire|inscrire|suivre|dissoudre|reconstituer)$/i.test(w); };
+function estTitre(l, suivante){
+  if (RE_COND.test(l) && /:$/.test(l) && l.length<=160) return true;                     /* « Si le résultat est hors limites : » */
+  if (/[.!?;]$/.test(l) || l.length>80) return false;
+  const lettres=l.replace(/[^A-Za-zÀ-ÿ]/g,""); const maj=l.replace(/[^A-ZÀ-Ý]/g,"");
+  if (lettres.length>=6 && maj.length/lettres.length>0.75 && l.split(/\s+/).length>=2) return true;      /* TITRE EN MAJUSCULES */
+  if (/^\d+(\.\d+)*\.?\s+\S/.test(l) && l.split(/\s+/).length<=9 && !debutInfinitif(l.replace(/^\d+(\.\d+)*\.?\s+/,"")) && !RE_NOTE.test(l.replace(/^\d+(\.\d+)*\.?\s+/,""))) return true;   /* 4.1. Contrôle conforme */
+  if (RE_COND.test(l) && /:$/.test(l)) return true;                                       /* « Si le résultat est hors limites : » */
+  if (suivante!==undefined && l.split(/\s+/).length<=8 && !/[:,]/.test(l) && !debutInfinitif(l) && !premierVerbe(l) && !RE_NOTE.test(l) && !RE_COND.test(l) && /^[A-ZÀ-Ý]/.test(l)) return true;   /* titre court sans ponctuation */
+  if (/:$/.test(l) && suivante!==undefined && !/^•/.test(l) && !estAction(l) && !RE_NOTE.test(l) && !RE_COND.test(l) && l.split(/\s+/).length<=7) return true;
+  return false;
+}
+const titrePropre = l => { let t=l.replace(/^\d+(\.\d+)*\.?\s+/,"").replace(/[:.\s–-]+$/,"").replace(/,?\s*proc[ée]der comme suit$/i,"").trim(); const lettres=t.replace(/[^A-Za-zÀ-ÿ]/g,""); if (lettres && t.replace(/[^A-ZÀ-Ý]/g,"").length/lettres.length>0.75) t=cap(t.toLowerCase()); return t; };
+function sansDoublons(lines){
+  const out=lines.slice(); const k=out.map(l=>norm(l).replace(/[^a-z0-9]+/g," ").trim());
+  for (let j=1;j<out.length;j++){
+    for (let i=0;i<j;i++){
+      if (!k[i] || k[i]!==k[j]) continue;
+      let L=0; while (j+L<out.length && i+L<j && k[i+L]===k[j+L]) L++;
+      if (L>=4){ out.splice(j,L); k.splice(j,L); j--; break; }
+    }
+  }
+  return out;
+}
+/* Analyse un texte (copié, importé ou dicté) en parties / étapes / points / précautions, sans Claude */
+function parseStruct(texte, qid){
+  let lines=String(texte||"").replace(PUCES,"• ").replace(EMOJI,"").split(/\r?\n/)
+    .map(l=>l.replace(/^[ \t]*(o|-|\*|–|·)[ \t]+/,"• ").replace(/\s+/g," ").trim()).filter(l=>l && !/^[•\-–]$/.test(l));
+  lines=sansDoublons(lines);
+  const etapes=[], notes=[]; let section="";
+  const toutNote = qid && /^a/.test(qid);            /* rubrique « Alertes » : tout est précaution */
+  /* texte dicté ou tapé d'un seul tenant (sans titres ni listes) : découpage en phrases et en actions parlées */
+  if (lines.length<=3 && !lines.some(l=>/:$/.test(l) || /^•\s/.test(l)) && lines.join(" ").split(/\s+/).length>=4){
+    for (const e of decouperLocal(lines.join(" "))){
+      if (toutNote || RE_NOTE.test(e.action)) notes.push(normNote({texte:e.action+(e.alerte?" "+e.alerte:""), niveau:RE_ABS.test(e.action)?"absolu":RE_INFO.test(e.action)?"info":"attention"}));
+      else etapes.push(normEtape(e));
+    }
+    return regrouper({etapes, notes});
+  }
+  let last=null;      /* dernier élément créé (étape ou note), pour rattacher les points */
+  for (let i=0;i<lines.length;i++){
+    let l=lines[i]; const puce=/^•\s/.test(l); if (puce) l=l.replace(/^•\s+/,"");
+    const suiv=lines[i+1]; const suivPuce=suiv && /^•\s/.test(suiv);
+    const estPoint = x => x!==undefined && (/^•\s/.test(x) || (!estAction(x) && !RE_COND.test(x) && !RE_NOTE.test(x.replace(/^\d+(\.\d+)*\.?\s+/,"")) && !estTitre(x, "") && x.length<160 && !/:$/.test(x)));
+    /* intro « … suivants : » + liste (à puces ou non) */
+    if (/:$/.test(l) && !RE_COND.test(l) && estPoint(suiv) && (suivPuce || estAction(l) || /suivant|suivantes|notamment|comme suit/i.test(l))){
+      const sous=[]; let j=i+1; while (j<lines.length && estPoint(lines[j])){ sous.push(lines[j].replace(/^•\s+/,"").replace(/[.;]$/,"")); j++; }
+      const intro=l.replace(/:$/,"").trim();
+      if (RE_COND.test(intro) && !toutNote){ section=cap(intro.replace(/,?\s*proc[ée]der comme suit$/i,"")); last=null; continue; }
+      if (estAction(intro) && !toutNote){ const e=normEtape({action:cap(intro)+" :", section, sous}); e.bouton=extraireBouton(intro); etapes.push(e); last=e; }
+      else { const n=normNote({texte:cap(intro)+" :", niveau:RE_ABS.test(intro)?"absolu":RE_INFO.test(intro)?"info":"attention", sous}); notes.push(n); last=n; }
+      i=j-1; continue;
+    }
+    if (!puce && estTitre(l, suiv)){ section=titrePropre(l); last=null; continue; }
+    l=l.replace(/^\d+(\.\d+)*[.)]?\s+/,"");
+    /* phrase d'explication → alerte de l'étape précédente */
+    if (last && last.action!==undefined && /^(c'est|c’est|cette étape|cela|ceci|car\b|étape critique|il est (important|essentiel|indispensable|critique))/i.test(l)){
+      last.alerte=(last.alerte?last.alerte+" ":"")+cap(l.replace(/^c['’]est (effectivement |donc )?/i,""))+(/[.!?]$/.test(l)?"":"."); if(!last.niveau) last.niveau="attention"; continue; }
+    /* partie « Remarque… » : son contenu va dans les précautions */
+    const dansRemarque = /^(remar|rappel|note|important|attention|pr[ée]caution|avertissement|alarme)/i.test(section||"");
+    /* règle conditionnelle sans action (« Si …, il peut être validé ») */
+    const condSansAction = RE_COND.test(l) && !/:$/.test(l) && !estAction(l.slice(Math.max(0,l.indexOf(", ")+2)));
+    /* précaution, règle, alarme */
+    const m=l.match(/^(attention|avertissement|important|remarque|rappel|nb|n\.b\.|note|à savoir|cas particulier)\s*[:,–-]?\s*(.+)$/i);
+    if (toutNote || RE_NOTE.test(l) || m || dansRemarque || condSansAction){
+      const t=cap((m?m[2]:l).replace(/[.;]$/,""))+".";
+      if (puce && last && last.sous && !toutNote && !RE_NOTE.test(l)) { last.sous.push(t.replace(/\.$/,"")); continue; }
+      const n=normNote({texte:t, niveau:RE_ABS.test(l)?"absolu":(m&&RE_INFO.test(m[1]))||RE_INFO.test(l)||dansRemarque||condSansAction?"info":"attention"}); notes.push(n); last=n; continue;
+    }
+    /* point non-action sous une étape (ex. « Le numéro de lot du contrôle. ») */
+    if (puce && last && !estAction(l) && !RE_COND.test(l)){ last.sous.push(l.replace(/[.;]$/,"")); continue; }
+    const e=normEtape({action:cap(l.replace(/[;]$/,""))+(/[.!?:]$/.test(l)?"":"."), section}); e.bouton=extraireBouton(l);
+    etapes.push(e); last=e;
+  }
+  return regrouper({etapes, notes});
+}
+/* Regroupe : vérifications successives → une étape à points ; clics successifs → un chemin de menu */
+function regrouper(r){
+  const out=[];
+  for (let i=0;i<r.etapes.length;i++){
+    const e=r.etapes[i];
+    /* 3 vérifications courtes ou plus d'affilée, sans alerte ni photo */
+    const verif=x=>x && RE_VERIF.test(x.action) && !x.sous.length && !x.photo && !x.alerte && x.action.length<130 && x.section===e.section;
+    if (verif(e)){
+      let j=i; while (j<r.etapes.length && verif(r.etapes[j])) j++;
+      if (j-i>=3){
+        const verbe=e.action.match(RE_VERIF)[0];
+        out.push(normEtape({action:cap(verbe)+" :", section:e.section, niveau:r.etapes.slice(i,j).some(x=>x.niveau==="absolu")?"absolu":"",
+          sous:r.etapes.slice(i,j).map(x=>x.action.replace(RE_VERIF,"").replace(/^\s*(imp[ée]rativement|syst[ée]matiquement|bien|que)\s+/i,"").replace(/\.$/,"").trim()).map(cap)}));
+        i=j-1; continue;
+      }
+    }
+    /* chemin de menus : « Aller dans X » / « Cliquer sur Y » courts et consécutifs */
+    const clic=x=>x && x.bouton && !x.alerte && !x.photo && !x.sous.length && x.section===e.section &&
+      /^(cliquer|appuyer|toucher|aller|acc[ée]der|ouvrir|s[ée]lectionner)\b/i.test(x.action) &&
+      x.action.replace(/\([^)]*\)/g,"").replace(/[«»"]/g,"").replace(new RegExp(escRe(x.bouton),"i"),"").replace(/^(cliquer|appuyer|toucher)\s+(sur\s+)?|^(aller|acc[ée]der)\s+(dans|sur|à|au)\s+|^ouvrir\s+|^s[ée]lectionner\s+/i,"").replace(/\b(le|la|les|l'|du|de la|menu|onglet|bouton|écran|en haut|en bas|à gauche|à droite)\b/gi,"").replace(/[\s.,]+/g,"").length<=6;
+    if (clic(e)){
+      let j=i; while (j<r.etapes.length && clic(r.etapes[j])) j++;
+      if (j-i>=2){
+        const parts=r.etapes.slice(i,j).map(x=>{ const p=(x.action.match(/\(([^)]{2,60})\)/)||[])[1]; return x.bouton+(p?` (${p})`:""); });
+        out.push(normEtape({action:`${/^(aller|acc[ée]der|ouvrir)/i.test(e.action)?"Ouvrir":"Cliquer successivement sur"} : ${parts.join(" › ")}.`, bouton:r.etapes.slice(i,j).map(x=>x.bouton).join(" › "), section:e.section}));
+        i=j-1; continue;
+      }
+    }
+    out.push(e);
+  }
+  return {etapes:out, notes:r.notes};
+}
+/* Résultat de Claude → structure normalisée */
+function depuisClaude(v){
+  const et=(v&&Array.isArray(v.etapes)?v.etapes:[]).filter(e=>e&&e.action).map(normEtape);
+  const nt=(v&&Array.isArray(v.precautions)?v.precautions:Array.isArray(v&&v.notes)?v.notes:[]).filter(n=>n&&(n.texte||n.text)).map(normNote);
+  return {etapes:et, notes:nt};
+}
+const REGLES_CLAUDE = `Règles de mise en forme (obligatoires) :
+- "etapes" = uniquement les ACTIONS concrètes à faire, dans l'ordre, verbe à l'infinitif. Vise 4 à 10 étapes, jamais plus de 15. Regroupe les actions qui vont ensemble : des clics successifs dans les menus = UNE étape avec le chemin (ex. « Ouvrir : Requête › Requête QC »), une liste de vérifications = UNE étape « Vérifier : » avec les points dans "sous".
+- "section" = titre court de la partie quand le texte en a (ex. « Vérification de l'enregistrement », « Si le contrôle n'apparaît pas ») ; sinon "".
+- "precautions" = tout ce qui n'est pas une action à faire : avertissements, interdictions, règles, conditions et critères (« si … alors … »), alarmes, seuils, traçabilité, remarques. Courtes, sans doublon, 8 au maximum ; une liste dans "sous" si besoin. "niveau" = "absolu" (interdiction, obligation stricte), "attention" (précaution), "info" (remarque, rappel).
+- "alerte" sur une étape seulement si une mise en garde concerne précisément cette étape (une phrase courte), sinon "".
+- "bouton" = libellé exact du bouton, menu, onglet ou chemin cité dans l'étape, sinon "".
+- Supprime les répétitions (texte collé deux fois), les titres vides et les émojis. Garde tous les chiffres, volumes, seuils et noms exacts. N'invente rien.`;
+const SCHEMA_Q = `{"precautions":[{"texte":"","niveau":"attention","sous":[]}],"etapes":[{"section":"","action":"","bouton":"","alerte":"","niveau":"","sous":[]}]}`;
+
 /* Étapes à afficher : celles enregistrées, sinon celles détectées dans le texte */
 const _stepCache = new Map();
-function stepsOf(rep){
-  if (!rep) return [];
-  const et=(rep.etapes||[]).filter(e=>e.action);
-  if (et.length) return et;
-  const t=(rep.texte||"").trim(); if(!t) return [];
-  if (!_stepCache.has(t)) _stepCache.set(t, decouperTexte(t));
+function structOf(rep){
+  if (!rep) return {etapes:[], notes:[]};
+  const et=(rep.etapes||[]).filter(e=>e.action), nt=(rep.notes||[]).filter(n=>n.texte);
+  if (et.length || nt.length) return {etapes:et, notes:nt};
+  const t=(rep.texte||"").trim(); if(!t) return {etapes:[], notes:[]};
+  if (!_stepCache.has(t)) _stepCache.set(t, parseStruct(t));
   return _stepCache.get(t);
 }
+function stepsOf(rep){ return structOf(rep).etapes; }
 /* Faut-il (re)découper cette réponse à l'enregistrement ? */
 function needsSplit(rep){
   if (!rep || rep.na || !(rep.texte||"").trim()) return false;
-  const et=(rep.etapes||[]).filter(e=>e.action);
-  if (!et.length) return true;
-  const base = rep.splitFrom!==undefined ? rep.splitFrom : et.map(e=>e.action).join(" ");
+  const et=(rep.etapes||[]).filter(e=>e.action), nt=(rep.notes||[]).filter(n=>n.texte);
+  if (!et.length && !nt.length) return true;
+  const base = rep.splitFrom!==undefined ? rep.splitFrom : [...nt.map(n=>n.texte), ...et.map(e=>e.action)].join(" ");
   return norm(base).replace(/\s+/g," ").trim() !== norm(rep.texte).replace(/\s+/g," ").trim();
 }
 async function autoSplit(rep, q, nom){
   const anciennes=rep.etapes||[];
   const garder = list => list.map(e=>{ const o=anciennes.find(x=>x.photo && x.bouton && norm(x.bouton)===norm(e.bouton)); return o?{...e, photo:o.photo, box:o.box}:e; });
-  let et=null;
+  let r=null;
   if (Store.sample){
-    try{
-      const r = await Store.sample.json(promptEtapes(nom, q.t, rep.texte), {modelTier:"quick"});
-      et=(r&&Array.isArray(r.etapes)?r.etapes:[]).filter(e=>e&&e.action).map(e=>({id:uid(), action:String(e.action), bouton:String(e.bouton||""), alerte:String(e.alerte||""), niveau:["absolu","attention"].includes(e.niveau)?e.niveau:"", photo:"", box:null}));
-      if(!et.length) et=null;
-    }catch(e){ et=null; }
+    try{ r=depuisClaude(await Store.sample.json(promptEtapes(nom, q.t, rep.texte), {modelTier:"default"})); if(!r.etapes.length && !r.notes.length) r=null; }
+    catch(e){ r=null; }
   }
-  if (!et) et=decouperTexte(rep.texte);
-  rep.etapes=garder(et); rep.splitFrom=rep.texte;
-  return rep.etapes.length;
+  if (!r) r=parseStruct(rep.texte, q.id);
+  rep.etapes=garder(r.etapes); rep.notes=r.notes; rep.splitFrom=rep.texte;
+  return rep.etapes.length + rep.notes.length;
 }
 function promptEtapes(nom, question, txt){
-  return `Tu aides un technicien de laboratoire à rédiger la procédure de l'automate « ${nom} ». Question de la procédure : « ${question} ». Texte saisi ou dicté par le technicien (il peut être copié d'un document, avec des numéros, des titres, des puces, ou contenir des erreurs de dictée et les mots « étape suivante ») : « ${txt} ». Découpe ce texte en étapes, dans l'ordre, sans rien inventer ni ajouter. Une étape = une action concrète, verbe à l'infinitif ; si le texte donne un titre d'étape, commence l'action par ce titre suivi de « : ». Corrige seulement les fautes évidentes${Corr.pairs.length?` (corrections connues de la dictée : ${Corr.pairs.slice(0,40).map(p=>`« ${p.de} » = « ${p.vers} »`).join(", ")})`:""}. Pour chaque étape : "bouton" = libellé exact du bouton, menu, onglet ou élément cité (chaîne vide si aucun) ; "alerte" = la vérification ou mise en garde associée à cette étape (chaîne vide sinon) ; "niveau" = "absolu" pour une interdiction stricte, "attention" pour une vérification ou une précaution, "" sinon. Réponds uniquement en JSON : {"etapes":[{"action":"","bouton":"","alerte":"","niveau":""}]}`;
+  return `Tu aides un technicien de laboratoire à mettre en forme la procédure de l'automate « ${nom} ». Question de la procédure : « ${question} ». Texte saisi, collé ou dicté par le technicien (il peut contenir des titres, des puces, des répétitions, des erreurs de dictée et les mots « étape suivante ») :
+"""
+${txt}
+"""
+Corrige seulement les fautes évidentes${Corr.pairs.length?` (corrections connues de la dictée : ${Corr.pairs.slice(0,40).map(p=>`« ${p.de} » = « ${p.vers} »`).join(", ")})`:""}.${/^a/.test(QI&&Object.values(QI).find(x=>x.t===question)?.id||"")?" Cette question porte sur les alertes : mets tout dans \"precautions\" et laisse \"etapes\" vide.":""}
+${REGLES_CLAUDE}
+Réponds uniquement en JSON : ${SCHEMA_Q}`;
 }
 function previewHTML(rep){
   if (!rep || rep.na || !(rep.texte||"").trim() || !needsSplit(rep)) return "";
-  const et=decouperTexte(rep.texte);
-  if (!et.length) return "";
-  return `<div class="preview"><div class="row" style="justify-content:space-between"><span class="eyebrow">Aperçu : ${et.length} étape${et.length>1?"s":""} détectée${et.length>1?"s":""}</span><span class="hint">${Store.sample?"Claude affinera à l'enregistrement":"Appliqué à l'enregistrement"}</span></div>
-    <ol class="steps">${et.map(e=>`<li class="step"><div class="step-body"><div>${fmtAction(e.action)}${e.bouton?` <span class="kbd">${esc(e.bouton)}</span>`:""}</div>${alertHTML(e)}</div></li>`).join("")}</ol></div>`;
+  const q=ALLQ[S.qi]; const r=parseStruct(rep.texte, q&&q.id);
+  if (!r.etapes.length && !r.notes.length) return "";
+  return `<div class="preview"><div class="row" style="justify-content:space-between"><span class="eyebrow">Aperçu : ${r.etapes.length} étape${r.etapes.length>1?"s":""}${r.notes.length?` · ${r.notes.length} précaution${r.notes.length>1?"s":""}`:""}</span><span class="hint">${Store.sample?"Claude affinera à l'enregistrement":"Appliqué à l'enregistrement"}</span></div>
+    ${repHTML(null, r)}</div>`;
+}
+/* Rendu commun : encadré Précautions + étapes numérotées par parties, avec points et photos */
+function notesHTML(notes, ts){
+  if (!notes.length) return "";
+  return `<div class="notes"><div class="notes-h">${I.warn}Précautions et alarmes</div><ul>${notes.map(n=>`<li class="n-${n.niveau||"attention"}"><b>${NIV_NOTE[n.niveau]||"Attention"}</b><span>${hi(n.texte,ts)}${n.sous&&n.sous.length?`<ul class="sous">${n.sous.map(x=>`<li>${hi(x,ts)}</li>`).join("")}</ul>`:""}</span></li>`).join("")}</ul></div>`;
+}
+function repHTML(qid, r, ts, photos){
+  let sec=null;
+  const et=r.etapes.map((e,i)=>{
+    let h="";
+    if ((e.section||"")!==(sec||"")){ sec=e.section||""; if (sec) h+=`<li class="sec">${hi(sec,ts)}</li>`; }
+    return h+`<li class="step"${qid?` data-key="${qid}:${i}"`:""}><div class="step-body"><div>${fmtAction(e.action,ts)}${e.bouton?` <span class="kbd">${hi(e.bouton,ts)}</span>`:""}</div>
+      ${e.sous&&e.sous.length?`<ul class="sous">${e.sous.map(x=>`<li>${hi(x,ts)}</li>`).join("")}</ul>`:""}${alertHTML(e,ts)}${photos?shotHTML(e):""}</div></li>`;
+  }).join("");
+  return notesHTML(r.notes, ts) + (et?`<ol class="steps">${et}</ol>`:"");
 }
 /* Titre d'étape (avant « : ») en gras, comme dans les procédures existantes */
 function fmtAction(a, ts){
@@ -1416,14 +1615,15 @@ const dateFR = iso => { try{ return new Date(iso).toLocaleString("fr-FR",{day:"2
 function sigQ(r){
   if (!r) return "vide";
   if (r.na) return "na";
-  const et=(r.etapes||[]).filter(e=>e.action), t=(r.texte||"").trim();
-  if (!et.length && !t) return "vide";
-  return JSON.stringify([t, et.map(e=>[e.action,e.bouton,e.alerte,e.niveau,e.photo])]);
+  const et=(r.etapes||[]).filter(e=>e.action), nt=(r.notes||[]).filter(n=>n.texte), t=(r.texte||"").trim();
+  if (!et.length && !nt.length && !t) return "vide";
+  return JSON.stringify([t, et.map(e=>[e.section,e.action,e.bouton,e.alerte,e.niveau,e.photo,e.sous]), nt.map(n=>[n.texte,n.niveau,n.sous])]);
 }
 function qSummary(r){
   const s=sigQ(r); if (s==="vide") return "Réponse vide"; if (s==="na") return "Sans objet";
-  const et=stepsOf(r); if (!et.length) return (r.texte||"").slice(0,80);
-  return `${et.length} étape${et.length>1?"s":""} : ${et[0].action.slice(0,70)}${et[0].action.length>70||et.length>1?"…":""}`;
+  const et=stepsOf(r), nt=notesOf(r); if (!et.length && !nt.length) return (r.texte||"").slice(0,80);
+  if (!et.length) return `${nt.length} précaution${nt.length>1?"s":""} : ${nt[0].texte.slice(0,70)}…`;
+  return `${et.length} étape${et.length>1?"s":""}${nt.length?` · ${nt.length} précaution${nt.length>1?"s":""}`:""} : ${et[0].action.slice(0,70)}${et[0].action.length>70||et.length>1?"…":""}`;
 }
 /* Versions antérieures d'une question, différentes de la réponse enregistrée, la plus récente d'abord */
 function qHist(id, qid){
@@ -1700,7 +1900,11 @@ document.addEventListener("click", async ev=>{
     case "say-q": TTS.say(ALLQ[S.qi].t); break;
     case "mic": startRec(); break;
     case "split": stopRec(); splitSteps(t); break;
-    case "add-step": curRep().etapes.push({id:uid(), action:"", bouton:"", alerte:"", niveau:"", photo:"", box:null}); render(); break;
+    case "add-step": curRep().etapes.push(normEtape({})); render(); break;
+    case "note-add": { const r=curRep(); (r.notes=r.notes||[]).push(normNote({texte:" ", niveau:"attention"})); r.notes[r.notes.length-1].texte=""; r.splitFrom=r.texte; render(); break; }
+    case "note-del": { const r=curRep(); r.notes.splice(+t.dataset.i,1); r.splitFrom=r.texte; render(); break; }
+    case "note-tostep": { const r=curRep(); const n=r.notes.splice(+t.dataset.i,1)[0]; if(n){ r.etapes.push(normEtape({action:n.texte, sous:n.sous})); } r.splitFrom=r.texte; render(); break; }
+    case "st-tonote": { const r=curRep(); const e=r.etapes.splice(+t.dataset.i,1)[0]; if(e){ (r.notes=r.notes||[]).push(normNote({texte:e.action+(e.alerte?" "+e.alerte:""), niveau:e.niveau||"attention", sous:e.sous})); } r.splitFrom=r.texte; render(); toast("Étape transformée en précaution."); break; }
     case "st-up": case "st-down": case "st-del": { const et=curRep().etapes, i=+t.dataset.i;
       if(act==="st-del") et.splice(i,1); else { const j=act==="st-up"?i-1:i+1; [et[i],et[j]]=[et[j],et[i]]; } render(); break; }
     case "photo": stopRec(); openPhoto(+t.dataset.i); break;
@@ -1740,7 +1944,8 @@ document.addEventListener("input", ev=>{
   if(t.id==="search"){ S.search=t.value; render(); return; }
   if(t.id==="searchall"){ S.searchAll=t.value; render(); return; }
   if(t.id==="qsearch"){ S.qsearch=t.value; const box=$("#qresults"); if(box&&S.draft) box.innerHTML=qResults(S.draft); return; }
-  if(t.dataset.st!=null){ const r=curRep(); const e=r.etapes[+t.dataset.st]; if(e){ e[t.dataset.k]=t.value; r.splitFrom=r.texte; } }
+  if(t.dataset.st!=null){ const r=curRep(); const e=r.etapes[+t.dataset.st]; if(e){ e[t.dataset.k]= t.dataset.k==="sous" ? t.value.split("\n").map(x=>x.trim()).filter(Boolean) : t.value; r.splitFrom=r.texte; } }
+  if(t.dataset.nt!=null){ const r=curRep(); const n=(r.notes||[])[+t.dataset.nt]; if(n){ n[t.dataset.k]= t.dataset.k==="sous" ? t.value.split("\n").map(x=>x.trim()).filter(Boolean) : t.value; r.splitFrom=r.texte; } }
 });
 document.addEventListener("toggle", ev=>{ if(ev.target.classList && ev.target.classList.contains("corr")){ if(ev.target.dataset.hist) S.histOpen=ev.target.open; else if(ev.target.dataset.trash) S.trashOpen=ev.target.open; else S.corrOpen=ev.target.open; } }, true);
 document.addEventListener("focusin", ev=>{ const t=ev.target; if(t.dataset && t.dataset.st!=null && t.dataset.k!=="niveau") t.dataset.orig=t.value; });
@@ -1758,6 +1963,7 @@ document.addEventListener("change", async ev=>{
     if(pairs.length){ const r=curRep(); const t1=applyCorr(r.texte||""); if(t1!==(r.texte||"")){ r.texte=t1; const box=$("#answer"); if(box) box.value=t1; } r.splitFrom=r.texte; }
   }
   if(t.dataset.st!=null && t.dataset.k==="niveau"){ const e=curRep().etapes[+t.dataset.st]; if(e) e.niveau=t.value; }
+  if(t.dataset.nt!=null && t.dataset.k==="niveau"){ const r=curRep(); const n=(r.notes||[])[+t.dataset.nt]; if(n){ n.niveau=t.value; r.splitFrom=r.texte; } }
   if((t.id==="sh-cam"||t.id==="sh-gal") && t.files && t.files[0]){
     const f=t.files[0]; t.value="";
     if(f.type && !/^image\//.test(f.type)){ toast("Choisissez une image (photo ou capture d'écran)."); return; }
