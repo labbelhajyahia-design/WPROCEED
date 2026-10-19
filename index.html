@@ -177,6 +177,7 @@ mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
 .cards .confirm{margin-top:-4px}
 .hist{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:12px}
 .confirm .hint{display:block}
+.backup-row{margin-top:10px;gap:8px}
 .pick-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pick-row .pick{padding:22px 12px}
 .pick svg{width:28px;height:28px;color:var(--accent)}
@@ -411,6 +412,11 @@ function viewList(){
   const list = [...Store.cache].sort((a,b)=>(a.nom||"").localeCompare(b.nom||"","fr"));
   return `<header class="top"><span class="eyebrow">Fiches de poste · laboratoire</span><h1>Procédures Automates</h1>${storageLine()}</header>
   <div class="row"><button class="btn primary" data-act="new">${I.plus}Ajouter un automate</button><button class="btn" data-act="new-import">${I.wand}Importer une procédure complète</button></div>
+  <div class="row backup-row"><span class="hint">Sauvegarde et transfert :</span>
+    <button class="btn small" data-act="export-all">${I.down}Exporter les procédures</button>
+    <label class="btn small" for="restorefile">${I.up}Importer une sauvegarde</label>
+    <input type="file" id="restorefile" accept=".json,application/json" class="sr"></div>
+  ${restoreBlock()}
   ${list.length ? `${searchBox("searchall", S.searchAll, "Rechercher dans toutes les procédures (ex. calibration, réactif, Play)")}${S.searchAll.trim()?globalResults(list):""}<div class="cards">${list.map(a=>{ const n=countAnswered(a), p=Math.round(n/ALLQ.length*100);
     return `<div class="card" role="button" tabindex="0" data-act="open" data-id="${esc(a.id)}">
       <div style="min-width:0"><h2>${esc(a.nom||"Sans nom")}</h2>
@@ -1580,6 +1586,65 @@ async function importerFichier(file){
   }catch(e){ S.imp.file=null; render(); toast("Import impossible : "+((e&&e.message)||e)+".", 7000); }
 }
 
+/* ---------- Sauvegarde : exporter / importer toutes les procédures (transfert Claude ⇄ téléphone) ---------- */
+async function exporterTout(btn){
+  const list=[...Store.cache].sort((a,b)=>(a.nom||"").localeCompare(b.nom||"","fr"));
+  if (!list.length){ toast("Aucun automate à exporter."); return; }
+  const lbl=btn&&btn.lastChild, old=lbl&&lbl.textContent; if(btn){ btn.disabled=true; if(lbl) lbl.textContent=" Préparation…"; }
+  try{
+    const autos=[]; let nPhotos=0;
+    for (const a of list){
+      const c=clone(a);
+      for (const r of Object.values(c.reponses||{})) for (const e of (r.etapes||[])){
+        if (!e.photo) continue;
+        try{ const b=await Store.photoBlob(e.photo); if(b){ e.photo=await blobToDataURL(b); nPhotos++; } else e.photo=""; }catch(err){ e.photo=""; }
+      }
+      autos.push(c);
+    }
+    const data={app:"procedures-automates", version:1, date:new Date().toISOString(), automates:autos, corrections:Corr.pairs};
+    const d=new Date(), j=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    await saveFile(`Sauvegarde_procedures_${j}.json`, new Blob([JSON.stringify(data)],{type:"application/json"}));
+    toast(`${autos.length} automate${autos.length>1?"s":""} exporté${autos.length>1?"s":""}${nPhotos?` avec ${nPhotos} photo${nPhotos>1?"s":""}`:""}.`, 5000);
+  }catch(e){ toast("Export impossible : "+((e&&e.message)||e)+".", 6000); }
+  finally{ if(btn){ btn.disabled=false; if(lbl) lbl.textContent=old; } }
+}
+async function lireSauvegarde(file){
+  let data; try{ data=JSON.parse(await file.text()); }catch(e){ toast("Ce fichier n'est pas une sauvegarde valide (.json)."); return; }
+  let autos = Array.isArray(data&&data.automates) ? data.automates : (data && data.reponses && data.nom ? [data] : null);   /* sauvegarde complète ou fiche d'un seul automate */
+  if (!autos || !autos.length){ toast("Aucun automate trouvé dans ce fichier."); return; }
+  autos = autos.filter(a=>a && a.nom && a.reponses);
+  S.restore={file:file.name, autos, corrections:Array.isArray(data.corrections)?data.corrections:[]};
+  render(); window.scrollTo(0,0);
+}
+function restoreBlock(){
+  const R=S.restore; if(!R) return "";
+  const slug=a=>a.id || (norm(a.nom).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"automate");
+  return `<section class="confirm" style="margin-top:14px"><strong>Importer « ${esc(R.file)} » ?</strong>
+    <ul class="corr-list" style="margin:4px 0">${R.autos.map(a=>`<li><span><strong>${esc(a.nom)}</strong><br><span class="muted">${countAnswered(prepare(clone(a)))} / ${ALLQ.length} questions renseignées · ${Store.get(slug(a))?"remplacera la version de cet appareil (gardée dans l'historique)":"nouvel automate"}</span></span></li>`).join("")}</ul>
+    ${R.corrections.length?`<span class="hint">${R.corrections.length} correction${R.corrections.length>1?"s":""} de dictée seront aussi ajoutée${R.corrections.length>1?"s":""}.</span>`:""}
+    <div class="row"><button class="btn primary" data-act="restore-yes">Importer ${R.autos.length} automate${R.autos.length>1?"s":""}</button><button class="btn" data-act="restore-no">Annuler</button></div>
+  </section>`;
+}
+async function importerSauvegarde(btn){
+  const R=S.restore; if(!R) return; if(btn){ btn.disabled=true; btn.textContent="Import en cours…"; }
+  let n=0, ph=0;
+  try{
+    for (const src of R.autos){
+      const a=prepare(clone(src));
+      a.id = a.id || (norm(a.nom).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"automate-"+uid().slice(0,4));
+      for (const r of Object.values(a.reponses||{})) for (const e of (r.etapes||[])){
+        if (!e.photo) continue;
+        if (/^data:image\//.test(e.photo)){ try{ const b=await (await fetch(e.photo)).blob(); e.photo=await Store.putPhoto(b); ph++; }catch(err){ e.photo=""; e.box=null; } }
+        else if (!Store.get(a.id)) { e.photo=""; e.box=null; }        /* lien vers une photo d'un autre appareil : inutilisable ici */
+      }
+      await withTimeout(Store.save(a), 15000); n++;
+    }
+    if (R.corrections.length) await Corr.add(R.corrections.filter(p=>p&&p.de&&p.vers));
+    S.restore=null; render();
+    toast(`${n} automate${n>1?"s":""} importé${n>1?"s":""}${ph?` avec ${ph} photo${ph>1?"s":""}`:""}.`, 5000);
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent="Réessayer"; } toast(`Import interrompu après ${n} automate${n>1?"s":""} : ${errMsg(e)}.`, 7000); }
+}
+
 /* ---------- Événements ---------- */
 document.addEventListener("click", async ev=>{
   const t=ev.target.closest("[data-act]"); if(!t) return;
@@ -1587,6 +1652,9 @@ document.addEventListener("click", async ev=>{
   switch(act){
     case "new": go("new",{importAfter:false}); break;
     case "create": createAuto(); break;
+    case "export-all": exporterTout(t); break;
+    case "restore-yes": importerSauvegarde(t); break;
+    case "restore-no": S.restore=null; render(); break;
     case "confirm-no": S.confirm=null; render(); break;
     case "q-undo": { const q=ALLQ[S.qi]; const v=qHist(S.draft.id, q.id)[0]; if(!v){ toast("Aucune modification à annuler pour cette question."); break; }
       await restoreQuestion(q.id, v.rep, `Modification annulée : la question revient à sa version du ${dateFR(v.date)}.`); break; }
@@ -1683,6 +1751,7 @@ document.addEventListener("change", async ev=>{
   if(t.id==="na"){ curRep().na=t.checked; if(t.checked) stopRec(); render(); return; }
   if(t.id==="impaudio" && t.files && t.files[0]){ transcribeAudio(t.files[0]); return; }
   if(t.id==="impprecis"){ S.imp.precis=t.value==="1"; return; }
+  if(t.id==="restorefile" && t.files && t.files[0]){ const f=t.files[0]; t.value=""; lireSauvegarde(f); return; }
   if(t.id==="impfile" && t.files && t.files[0]){ const f=t.files[0]; t.value=""; importerFichier(f); return; }
   if(t.dataset.st!=null && t.dataset.k!=="niveau" && t.dataset.orig!==undefined && t.value!==t.dataset.orig){
     const pairs=learnAndApply(t.dataset.orig, t.value); t.dataset.orig=t.value;
