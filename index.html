@@ -196,12 +196,18 @@ mark{background:var(--hl);color:#1d1400;border-radius:3px;padding:0 1px}
 .q-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .q-head h3{min-width:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+button.pick{font:inherit;color:inherit;width:100%}
+.linkish{color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:600}
+.cam{background:#000;border-radius:var(--r);overflow:hidden;min-height:200px;display:grid;place-items:center}
+.cam video{display:block;width:100%;max-height:62vh;object-fit:contain}
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <div class="wrap" id="app"><div class="top"><span class="eyebrow">Fiches de poste</span><h1>Procédures Automates</h1><p class="muted">Chargement des automates…</p></div></div>
 <div class="player" id="player" hidden></div>
 <div class="sheet" id="sheet" hidden></div>
+<input type="file" id="sh-cam" accept="image/*" capture="environment" class="sr" tabindex="-1" aria-hidden="true">
+<input type="file" id="sh-gal" accept="image/*" class="sr" tabindex="-1" aria-hidden="true">
 <div class="toast" id="toast" hidden role="status"></div>
 
 <script>
@@ -291,9 +297,12 @@ function blobToDataURL(b){ return new Promise((res,rej)=>{ const r=new FileReade
 async function compress(file, max=1400, q=.82){
   const url = URL.createObjectURL(file);
   try{
-    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
-    const k = Math.min(1, max/Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement("canvas"); c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
+    let img;
+    try{ img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; }); }
+    catch(e){ if(!window.createImageBitmap) throw e; img = await createImageBitmap(file); }
+    const W=img.naturalWidth||img.width, H=img.naturalHeight||img.height; if(!W||!H) throw new Error("image vide");
+    const k = Math.min(1, max/Math.max(W, H));
+    const c = document.createElement("canvas"); c.width=Math.round(W*k); c.height=Math.round(H*k);
     c.getContext("2d").drawImage(img,0,0,c.width,c.height);
     return await new Promise(res=>c.toBlob(b=>res(b||file),"image/jpeg",q));
   } finally { URL.revokeObjectURL(url); }
@@ -334,7 +343,7 @@ const Store = { mode:"local", db:null, assets:null, sample:null, downloads:null,
       this.cache = await idb.all("automates").catch(()=>[]);
       let seeded=false; try{ seeded = localStorage.getItem("pa-seeded")==="1"; }catch(e){}
       if (!this.cache.length && SEED && !seeded){ const a=prepare(clone(SEED)); this.cache=[a]; await idb.put("automates",a).catch(()=>{}); try{ localStorage.setItem("pa-seeded","1"); }catch(e){} }
-      this.loaded=true; render();
+      this.loaded=true; render(); resumePending();
     }
   },
   get(id){ return this.cache.find(a=>a.id===id); },
@@ -1145,12 +1154,12 @@ async function saveDraft(notify=true){
 }
 
 /* ---------- Photo d'une étape et mise en évidence ---------- */
-const P = { i:null, blob:null, url:"", box:null, ref:"", busy:false, bouton:"" };
+const P = { i:null, blob:null, url:"", box:null, ref:"", busy:false, bouton:"", cam:false };
 async function openPhoto(i){
-  const e=curRep().etapes[i]; P.i=i; P.blob=null; P.box=e.box?{...e.box}:null; P.ref=e.photo||""; P.bouton=e.bouton||""; P.url=e.photo?await Store.photoURL(e.photo):""; P.busy=false;
+  const e=curRep().etapes[i]; P.i=i; P.blob=null; P.box=e.box?{...e.box}:null; P.ref=e.photo||""; P.bouton=e.bouton||""; P.url=e.photo?await Store.photoURL(e.photo):""; P.busy=false; stopCam();
   drawSheet(); $("#sheet").hidden=false; document.body.style.overflow="hidden";
 }
-function closeSheet(){ $("#sheet").hidden=true; document.body.style.overflow=""; if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.i=null; render(); }
+function closeSheet(){ stopCam(); $("#sheet").hidden=true; document.body.style.overflow=""; if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.i=null; render(); }
 function drawSheet(){
   const e=curRep().etapes[P.i]; const b=P.box;
   const canDetect = Store.sample && Store.images;
@@ -1158,21 +1167,73 @@ function drawSheet(){
     <div class="row" style="justify-content:space-between"><button class="btn ghost back" data-act="sh-close">${I.back}Retour</button><span class="eyebrow">Étape ${P.i+1}</span></div>
     <h2>${esc(e.action||"Étape sans texte")}</h2>
     <label class="f">Bouton ou menu à mettre en évidence<input type="text" id="sh-bouton" value="${esc(P.bouton)}" placeholder="Libellé exact à l'écran"></label>
-    <input type="file" id="sh-cam" accept="image/*" capture="environment" class="sr">
-    <input type="file" id="sh-gal" accept="image/*" class="sr">
-    ${P.url?`<div class="stage" id="stage"><img src="${esc(P.url)}" alt="Photo de l'étape">${b?`<div class="hl" style="left:${b.x*100}%;top:${b.y*100}%;width:${b.w*100}%;height:${b.h*100}%"></div>`:""}</div>
+    ${P.cam?`<div class="cam"><video id="sh-video" autoplay playsinline muted></video></div>
+      <div class="row"><button class="btn primary" data-act="sh-snap">${I.cam}Prendre la photo</button><button class="btn" data-act="sh-camstop">Annuler</button></div>
+      <p class="hint" style="margin:0">L'image ne s'affiche pas ? <label class="linkish" for="sh-cam">Ouvrir l'appli Appareil photo</label> ou <label class="linkish" for="sh-gal">choisir dans la galerie</label>.</p>`
+    :P.url?`<div class="stage" id="stage"><img src="${esc(P.url)}" alt="Photo de l'étape">${b?`<div class="hl" style="left:${b.x*100}%;top:${b.y*100}%;width:${b.w*100}%;height:${b.h*100}%"></div>`:""}</div>
       <p class="hint">Faites glisser le doigt sur la photo pour encadrer le bouton ou le menu.${canDetect?" Ou laissez Claude le repérer.":""}</p>
       <div class="row">${canDetect?`<button class="btn primary" data-act="sh-detect" ${P.busy?"disabled":""}>${I.target}${P.busy?"Recherche du bouton…":"Repérer le bouton"}</button>`:""}
-      ${b?`<button class="btn" data-act="sh-clear">Effacer le cadre</button>`:""}<label class="btn" for="sh-cam">${I.cam}Reprendre une photo</label><label class="btn" for="sh-gal">${I.img}Autre image de la galerie</label><button class="btn danger" data-act="sh-remove">Retirer la photo</button></div>`
+      ${b?`<button class="btn" data-act="sh-clear">Effacer le cadre</button>`:""}<button class="btn" data-act="sh-camera">${I.cam}Reprendre une photo</button><label class="btn" for="sh-gal">${I.img}Autre image de la galerie</label><button class="btn danger" data-act="sh-remove">Retirer la photo</button></div>`
     :`<div class="pick-row">
-        <label class="pick" for="sh-cam">${I.cam}<strong>Prendre une photo</strong><span class="hint">Ouvre l'appareil photo du téléphone.</span></label>
+        <button type="button" class="pick" data-act="sh-camera">${I.cam}<strong>Prendre une photo</strong><span class="hint">Caméra du téléphone, dans l'appli.</span></button>
         <label class="pick" for="sh-gal">${I.img}<strong>Choisir dans la galerie</strong><span class="hint">Une photo ou une capture d'écran déjà enregistrée.</span></label>
       </div>
-      <p class="hint" style="margin:0">Photographiez l'écran ou la partie de l'automate concernée par cette étape, puis encadrez le bouton.</p>`}
-    <div class="row"><button class="btn primary" data-act="sh-done" ${P.busy?"disabled":""}>Valider</button><button class="btn" data-act="sh-close">Annuler</button></div>
+      <p class="hint" style="margin:0">Photographiez l'écran ou la partie de l'automate concernée par cette étape, puis encadrez le bouton. Autre possibilité : <label class="linkish" for="sh-cam">l'appli Appareil photo du téléphone</label>.</p>`}
+    ${P.cam?"":`<div class="row"><button class="btn primary" data-act="sh-done" ${P.busy?"disabled":""}>Valider</button><button class="btn" data-act="sh-close">Annuler</button></div>`}
   </div>`;
   const st=$("#stage"); if(st) bindStage(st);
+  if(P.cam && Cam.stream){ const v=$("#sh-video"); if(v){ v.srcObject=Cam.stream; v.play().catch(()=>{}); } }
 }
+/* Caméra intégrée (getUserMedia) : la photo est prise sans quitter l'appli,
+   car Android ferme souvent l'appli installée pendant que l'appli Appareil photo est ouverte. */
+const Cam = { stream:null };
+function stopCam(){ if(Cam.stream){ try{ Cam.stream.getTracks().forEach(t=>t.stop()); }catch(e){} Cam.stream=null; } P.cam=false; }
+async function startCam(){
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ markPending(); $("#sh-cam").click(); return; }
+  P.cam=true; drawSheet();
+  try{
+    let s;
+    try{ s=await navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1440}}}); }
+    catch(e){ if(e && (e.name==="NotAllowedError"||e.name==="SecurityError")) throw e; s=await navigator.mediaDevices.getUserMedia({audio:false, video:true}); }
+    if(!P.cam || P.i==null){ s.getTracks().forEach(t=>t.stop()); return; }
+    Cam.stream=s; drawSheet();
+  }catch(e){
+    stopCam(); drawSheet();
+    toast(e && (e.name==="NotAllowedError"||e.name==="SecurityError")
+      ? "Accès à la caméra refusé. Autorisez la caméra (paramètres du téléphone › Applis › Procédures › Autorisations), ou utilisez la galerie."
+      : "Caméra intégrée indisponible : utilisez « l'appli Appareil photo » ou la galerie.", 8000);
+  }
+}
+async function snapCam(){
+  const v=$("#sh-video"); if(!v || !v.videoWidth){ toast("La caméra démarre, réessayez dans un instant."); return; }
+  const k=Math.min(1, 1400/Math.max(v.videoWidth, v.videoHeight));
+  const c=document.createElement("canvas"); c.width=Math.round(v.videoWidth*k); c.height=Math.round(v.videoHeight*k);
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  const b=await new Promise(r=>c.toBlob(r, "image/jpeg", .85));
+  stopCam();
+  if(!b){ drawSheet(); toast("Photo non prise, réessayez."); return; }
+  setPhotoBlob(b);
+}
+function setPhotoBlob(b){ if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=b; P.url=URL.createObjectURL(b); P.box=null; drawSheet(); }
+/* Si Android ferme l'appli pendant le choix d'une image, on rouvre la même étape au redémarrage */
+const PEND="pa-photo-pending";
+function markPending(){
+  try{ localStorage.setItem(PEND, JSON.stringify({id:S.draft&&S.draft.id, qi:S.qi, i:P.i, t:Date.now()})); }catch(e){}
+  if(Store.mode==="local" && S.draft && S.touched && S.touched.size) saveDraft(false).catch(()=>{});
+}
+function clearPending(){ try{ localStorage.removeItem(PEND); }catch(e){} }
+function resumePending(){
+  let p=null; try{ p=JSON.parse(localStorage.getItem(PEND)||"null"); }catch(e){}
+  clearPending();
+  if(!p || !p.id || Date.now()-p.t>20*60000 || !Store.get(p.id) || !ALLQ[p.qi]) return;
+  Object.assign(S, {view:"auto", autoId:p.id, tab:"saisir", qi:p.qi, draft:null, confirmDel:false}); render();
+  const r=S.draft && S.draft.reponses[ALLQ[p.qi].id];
+  if(r && r.etapes && r.etapes[p.i]){ openPhoto(p.i); toast("Le téléphone a fermé l'appli pendant le choix de l'image. Utilisez « Prendre une photo » (caméra dans l'appli) ou choisissez l'image à nouveau.", 9000); }
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible") setTimeout(clearPending, 4000);
+  else if(P.cam){ stopCam(); if(P.i!=null) drawSheet(); }
+});
 function bindStage(st){
   let o=null, el=null;
   const pos = ev=>{ const r=st.getBoundingClientRect(); return {x:clamp((ev.clientX-r.left)/r.width), y:clamp((ev.clientY-r.top)/r.height)}; };
@@ -1195,7 +1256,7 @@ async function detectBox(){
   P.busy=false; drawSheet();
 }
 async function finishPhoto(){
-  const e=curRep().etapes[P.i]; e.bouton=P.bouton.trim();
+  stopCam(); const e=curRep().etapes[P.i]; e.bouton=P.bouton.trim();
   if(P.blob){ P.busy=true; drawSheet();
     try{ e.photo = await Store.putPhoto(P.blob); }catch(err){ P.busy=false; drawSheet(); toast("Photo non enregistrée : "+((err&&err.message)||"réessayez.")); return; } }
   else e.photo=P.ref;
@@ -1847,6 +1908,7 @@ async function importerSauvegarde(btn){
 
 /* ---------- Événements ---------- */
 document.addEventListener("click", async ev=>{
+  if(ev.target.closest('label[for="sh-gal"],label[for="sh-cam"]')){ if(P.cam){ stopCam(); } markPending(); return; }
   const t=ev.target.closest("[data-act]"); if(!t) return;
   const act=t.dataset.act; const a=current();
   switch(act){
@@ -1928,7 +1990,10 @@ document.addEventListener("click", async ev=>{
     case "p-stop": TTS.stop(); break;
     case "p-rate": { const r=[0.8,1,1.2]; TTS.rate=r[(r.indexOf(TTS.rate)+1)%r.length]; drawPlayer(); if(TTS.playing) TTS.speak(); break; }
     case "sh-close": closeSheet(); break;
-    case "sh-pick": $("#sh-gal").click(); break;
+    case "sh-pick": markPending(); $("#sh-gal").click(); break;
+    case "sh-camera": startCam(); break;
+    case "sh-snap": snapCam(); break;
+    case "sh-camstop": stopCam(); drawSheet(); break;
     case "sh-clear": P.box=null; drawSheet(); break;
     case "sh-remove": if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=null; P.url=""; P.ref=""; P.box=null; drawSheet(); break;
     case "sh-detect": detectBox(); break;
@@ -1965,10 +2030,11 @@ document.addEventListener("change", async ev=>{
   if(t.dataset.st!=null && t.dataset.k==="niveau"){ const e=curRep().etapes[+t.dataset.st]; if(e) e.niveau=t.value; }
   if(t.dataset.nt!=null && t.dataset.k==="niveau"){ const r=curRep(); const n=(r.notes||[])[+t.dataset.nt]; if(n){ n.niveau=t.value; r.splitFrom=r.texte; } }
   if((t.id==="sh-cam"||t.id==="sh-gal") && t.files && t.files[0]){
-    const f=t.files[0]; t.value="";
+    const f=t.files[0]; t.value=""; clearPending();
+    if(P.i==null){ toast("Ouvrez d'abord l'étape à illustrer, puis choisissez la photo."); return; }
     if(f.type && !/^image\//.test(f.type)){ toast("Choisissez une image (photo ou capture d'écran)."); return; }
-    try{ const b=await compress(f); if(P.blob&&P.url) URL.revokeObjectURL(P.url); P.blob=b; P.url=URL.createObjectURL(b); P.box=null; drawSheet(); }
-    catch(e){ toast("Cette image ne peut pas être lue."); }
+    try{ setPhotoBlob(await compress(f)); }
+    catch(e){ toast(/heic|heif/i.test(f.type+f.name) ? "Format HEIC non lu : prenez la photo avec « Prendre une photo » ou choisissez une image JPEG." : "Cette image ne peut pas être lue."); }
   }
 });
 function ficheValues(f){ const vals={}; f.querySelectorAll("[data-fiche]").forEach(i=>vals[i.dataset.fiche]=i.value.trim()); return vals; }
